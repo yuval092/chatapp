@@ -1,0 +1,209 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignalR Private Chat - User List</title>
+
+    <!-- Import SignalR client library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+
+    <!-- Styles for the chat interface -->
+    <style>
+
+/* Hide header and footer */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #chatBox {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 80%;
+            height: 400px;
+            overflow-y: auto;
+            margin: 20px auto;
+            background-color: white;
+        }
+
+        #userList {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 80%;
+            height: 150px;
+            overflow-y: auto;
+            margin: 20px auto;
+            background-color: #eee;
+        }
+
+        .message {
+            display: flex;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+        }
+
+            .message.sent {
+                justify-content: flex-end;
+                background-color: #DCF8C6; /* WhatsApp green */
+                align-self: flex-end;
+            }
+
+            .message.received {
+                justify-content: flex-start;
+                background-color: #fff;
+                border: 1px solid #ccc;
+            }
+
+            .message p {
+                margin: 0;
+            }
+
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            margin: 10px;
+        }
+
+        button {
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+            button:hover {
+                background-color: #45a049;
+            }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>SignalR Private Chat - User List</h1>
+
+    <!-- User Input -->
+    <p>Your Connection ID: <span id="connectionId">Not connected</span></p>
+    <input type="text" id="userInput" placeholder="Enter your name..." />
+    <button id="registerButton">Register</button>
+
+    <!-- List of connected users -->
+    <h3>Connected Users:</h3>
+    <ul id="userList">
+        <!-- User list will appear here -->
+    </ul>
+
+    <!-- Chat Box -->
+    <div id="chatBox">
+        <!-- Chat messages will appear here -->
+    </div>
+
+    <input type="text" id="targetConnectionId" placeholder="Enter target connection ID..." />
+    <input type="text" id="messageInput" placeholder="Enter message..." />
+    <button id="sendButton">Send Private Message</button>
+
+    <script>
+        // Build the SignalR connection
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/echoHub")  // Connect to the EchoHub endpoint
+            .build();
+
+        // Start the connection
+        connection.start()
+            .then(() => {
+                console.log("Connection started");
+                // Display connection ID after connection is established
+               // document.getElementById("connectionId").innerText = connection.connectionId;
+                document.getElementById("connectionId").innerText = "Conected to server";
+            })
+            .catch(err => console.error("Error starting connection:", err));
+
+        // Register the user
+        document.getElementById("registerButton").addEventListener("click", async () => {
+            const userName = document.getElementById("userInput").value;
+            if (!userName) {
+                alert("Please enter your name.");
+                return;
+            }
+            await connection.invoke("RegisterUser", userName);
+
+            // Show the connection ID after registration
+            document.getElementById("connectionId").innerText = connection.connectionId;
+        });
+
+        // Update the list of connected users
+        connection.on("UpdateUserList", (userName ,users) => {
+            const userList = document.getElementById("userList");
+            userList.innerHTML = ""; // Clear the current list
+
+            // Populate the user list with the new data
+            users.forEach(user => {
+
+                console.log(users);
+                const newUserItem = document.createElement("li");
+                const tempDisplay = "User: " + user.userName.padEnd(15, ' ') +" ID: " + user.connectionId ;
+
+               // newUserItem.innerText = `User:  ${user.userName.padEnd(15, '=')}  ID: ${user.connectionId}`;
+                newUserItem.innerText = tempDisplay;
+                userList.appendChild(newUserItem);
+            });
+        });
+
+        // Handle the send button click event for private message
+        document.getElementById("sendButton").addEventListener("click", async () => {
+            const user = document.getElementById("userInput").value;
+            const message = document.getElementById("messageInput").value;
+            const targetConnectionId = document.getElementById("targetConnectionId").value;
+
+            if (!user || !message || !targetConnectionId) {
+                alert("Please enter a user name, target connection ID, and a message.");
+                return;
+            }
+
+            try {
+                // Call the SendMessageToClient method on the server
+                await connection.invoke("SendMessageToClient", targetConnectionId, user, message);
+
+                // Display the sent message locally, aligned to the right
+                displayMessage(user, message, "sent");
+
+                // Clear the message input after sending
+                document.getElementById("messageInput").value = "";
+            } catch (err) {
+                console.error("Error sending message:", err);
+            }
+        });
+
+        // Function to display a message in the chat box
+        function displayMessage(user, message, messageType) {
+            const chatBox = document.getElementById("chatBox");
+            const newMessage = document.createElement("div");
+            newMessage.classList.add("message", messageType);
+
+            const messageContent = document.createElement("p");
+            messageContent.innerText = `${user}: ${message}`;
+            newMessage.appendChild(messageContent);
+
+            chatBox.appendChild(newMessage);
+            chatBox.scrollTop = chatBox.scrollHeight;  // Scroll to the bottom after a new message
+        }
+
+        // Handle receiving a message
+        connection.on("ReceiveMessage", (user, message) => {
+            displayMessage(user, message, "received");
+        });
+    </script>
+</body>
+</html>

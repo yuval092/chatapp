@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0 , maximum-scale=1.0 , user-scalable=no"   > 
+   
+    <title>Video Call</title>
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            background-color: #d9f0f8;
+            position: relative;
+            object-fit: cover;
+        }
+
+        .grid-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            position: relative;
+        }
+
+        #remoteVideo {
+            width: 100%;
+            height: calc(100vh - 130px);
+            object-fit: cover;
+            border: 1px solid #ccc;
+        }
+
+        #localVideo {
+            width: 120px;
+            height: 90px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            border: 2px solid #6200EA;
+            border-radius: 5px;
+            z-index: 10;
+            object-fit: cover;
+            cursor: grab;
+        }
+
+
+        img {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5; /* Ensures the image appears on top of the video */
+            width: auto; /* Adjust width/height as needed */
+            max-width: 95%; /* Prevents image from exceeding video size */
+            max-height: calc(100vh - 100px); /* Keeps it proportional to the video */
+            pointer-events: none; /* Allows clicks to pass through to the video */
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 3px;
+        }
+
+        button {
+            padding: 40px 30px;
+            background-color: #d9f0f8;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+
+        .disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+
+
+
+        .textbox-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+
+
+
+
+    <main class="grid-container">
+        <div>
+            <video id="remoteVideo" autoplay playsinline></video>
+            <img id="audiocallImage" src="call.png">
+            <video id="localVideo" autoplay playsinline muted></video>
+        </div>
+
+        <div class="button-container">
+            <button id="startCallButton" onclick="startCall()" hidden>Start Call</button>
+            <button id="acceptCallButton" class="disabled" disabled onclick="acceptCall()" hidden>Accept Call</button>
+            <button id="endCallButton" onclick="endCallLocal()" style="position: relative;">
+                <img src="endcall.png" alt="End Call" style="width:200px; height:60px; vertical-align: middle;">
+            </button>
+
+        </div>
+
+        <!--
+
+    <div class="textbox-container">
+        <input type="text" id="connectionIdTextbox" placeholder="Local ID...">
+        <input type="text" id="newUserNotificationTextbox" placeholder="Remote ID...">
+    </div>  -->
+
+    </main>
+
+    <!-- Include SignalR client  microsoft-signalr  7.0.5  signalr.min.js     -->
+    <script src="lib/signalr.min.js"></script>
+
+
+    <script>
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        let localStream;
+        let peerConnection;
+        let remoteUserId;
+        let remoteOffer;
+
+        const servers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+            ],
+        };
+
+
+        document.getElementById('acceptCallButton').style.display = 'none';
+        document.getElementById('startCallButton').style.display = 'none';
+
+
+        let hash = window.location.hash.substring(1);
+        let params = new URLSearchParams(hash);
+        let localUserName = params.get('param1');
+        let remoteUserName = params.get('param2');
+        let autoCall = params.get('param3');
+        let audioOrVideo = params.get('param4');
+
+        let videoEnabeled = true;
+        
+        if (audioOrVideo == "Audio") {
+
+            videoEnabeled = false;
+            document.getElementById('localVideo').style.display = 'none';
+
+        }
+        else {
+            videoEnabeled = true;
+            document.getElementById('audiocallImage').style.display = 'none';
+        }
+        console.log("Video -> ", videoEnabeled);
+        
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/echoHub")  // Connect to the EchoHub endpoint
+            .build();
+
+        // Start the connection
+        connection.start()
+            .then(() => {
+                console.log("Connection started");
+                
+                RegisterUser();
+                GetWebRtcUsersId()
+                if (autoCall == "Call") startCall();
+                if (autoCall == "Answer") WaitForAnswer();
+            })
+            .catch(err => console.error("Error starting connection:", err));
+
+
+        async function RegisterUser() {
+
+            await connection.invoke("RegisterUser", localUserName);
+
+        };
+
+        async function GetWebRtcUsersId() {
+
+            const timeout = 10000; 
+
+            //  promise  יוצרים
+            // ומחכים 10 שניות  עם לא התקבלה תשובה יוצרים שגיעה
+            //   ומפסיקים לחכות לתשובה 
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out')), timeout)
+            );
+
+            
+            try {
+                await Promise.race([
+                    connection.invoke("GetWebRtcUserId", localUserName, remoteUserName),
+                    timeoutPromise
+                ]);
+              
+            } catch (error) {
+                console.error("time out");
+            }
+
+
+           // await connection.invoke("GetWebRtcUserId", localUserName, remoteUserName);
+        }
+
+
+        function WaitForAnswer() {
+            let wait5Secondes = 0;
+            return new Promise((resolve) => {
+                const interval = setInterval(() => {
+                    if (remoteOffer) {            // Offer recived from other user
+                        acceptCall();
+                        clearInterval(interval);  // Stop the timer once remoteOffer is set
+                        resolve(remoteOffer);     // Resolve the promise with remoteOffer data
+
+                    }
+                    wait5Secondes++;
+                    if (wait5Secondes == 100) {
+                        clearInterval(interval);  // Stop the timer once remoteOffer is set
+                        resolve(false);
+                        console.log("Exit without Offer")
+                        
+                    }
+                }, 500); // Check every 100 milliseconds
+            });
+        }
+
+
+        connection.on("WebRtcIdfromServer", (localUser, remoteUser) => {
+
+            //   document.getElementById('newUserNotificationTextbox').value = remoteUser;
+            //   document.getElementById('connectionIdTextbox').value = localUser;
+            remoteUserId = remoteUser;
+
+        });
+
+
+
+        // Handle ICE candidate received
+        connection.on('ReceiveCandidate', async (candidateData) => {
+            try {
+                console.log("Candidate recived ->", candidateData)
+                // Create the RTCIceCandidate with the correct properties
+                const candidate = new RTCIceCandidate(candidateData);
+                if (peerConnection.remoteDescription) await peerConnection.addIceCandidate(candidate);
+            }
+            catch (error) {
+                console.error('Error adding received ICE candidate:', error);
+            }
+        });
+
+
+        // Handle offer received from the remote user (Callee side)
+        connection.on('offer', async (offerData) => {
+
+            console.log("OfferData ->", offerData)
+
+            remoteUserId = offerData.remoteUserId; // Store the sender's ID
+            remoteOffer = offerData.offer; // Store the received offer
+
+            console.log("offer was stored -> ", offerData.offer)
+            console.log("RemoteUserId was stored -> ", offerData.remoteUserId)
+
+            if (!peerConnection) {
+                peerConnection = createPeerConnection(remoteUserId);
+            }
+
+            // Enable the accept call button only if the offer is received
+          //  document.getElementById('acceptCallButton').classList.remove('disabled');
+          //  document.getElementById('acceptCallButton').disabled = true;
+           document.getElementById('endCallButton').classList.remove('disabled');
+           document.getElementById('endCallButton').disabled = false;
+          //  document.getElementById('startCallButton').classList.add('disabled'); 
+          //  document.getElementById('startCallButton').disabled = true;
+
+            document.getElementById('acceptCallButton').style.display = 'none';
+            document.getElementById('startCallButton').style.display = 'none';
+
+        });
+
+
+
+
+        // Handle answer received from the remote user (Caller side)
+        connection.on('answer', async (data) => {
+            try {
+                console.log("got anser ->", data)
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+            } catch (error) {
+                console.error('Error handling answer:', error);
+            }
+        });
+
+
+
+
+
+
+        // Create Peer Connection
+
+        function createPeerConnection(remoteUserId) {
+            const pc = new RTCPeerConnection(servers);
+
+
+
+            // Handle ICE candidate generation
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Send the candidate to the specific remote user
+                    setTimeout(() => {
+
+                        connection.invoke("SendCandidate", event.candidate, remoteUserId)
+                            .catch(err => console.error(err));
+
+
+
+                    }, 500);
+                }
+            };
+
+
+
+
+
+            // Handle the track event (when a remote track is received)
+            pc.ontrack = (event) => {
+                console.log('Track received:', event);
+                if (event.streams && event.streams[0]) {
+                    document.getElementById('remoteVideo').srcObject = event.streams[0];
+                } else {
+                    console.error('No streams found in the received track event.');
+                }
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                console.log('ICE Connection State:', pc.iceConnectionState);
+            };
+
+
+            return pc;
+        }
+
+
+
+        //=========    Start the call (Caller side)  ============
+        async function startCall() {
+            try {
+
+                await GetWebRtcUsersId();
+                
+
+                console.log("Remote user id ->", remoteUserId)
+                if (!remoteUserId) {
+                                       
+                    closePage();
+                    return;
+                }
+
+                // Get local media (video/audio)
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: videoEnabeled,  // Capture video stream
+                    audio: {
+                        echoCancellation: true,  // Enable echo cancellation
+                        noiseSuppression: true,  // Enable noise suppression (optional)
+                        autoGainControl:  true     // Enable automatic gain control (optional)
+                    }
+                });
+
+               // localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+                
+
+
+                peerConnection = createPeerConnection(remoteUserId);
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+
+                // Create an offer
+                const offer = await peerConnection.createOffer();
+                if (!offer) {
+                    console.error('Failed to create an offer');
+                    return;
+                }
+
+                await peerConnection.setLocalDescription(offer);
+
+                // Send the offer to the remote user
+                // connection.invoke("Offer", { offer, remoteUserId })
+                //                        .catch(err => console.error(err));
+
+
+                connection.invoke("Offer", offer, remoteUserId)
+                    .catch(err => console.error(err));
+
+
+
+
+                // Update UI
+              //  document.getElementById('startCallButton').classList.add('disabled');
+              //  document.getElementById('startCallButton').disabled = true;
+              //  document.getElementById('endCallButton').classList.remove('disabled');
+              //  document.getElementById('endCallButton').disabled = false;
+
+
+                document.getElementById('acceptCallButton').style.display = 'none';
+                document.getElementById('startCallButton').style.display = 'none';
+            }
+
+
+            catch (error) {
+                console.error('Error starting call:', error);
+            }
+        }
+
+        //=============    Accept Call Calle side =================================
+
+
+
+        async function acceptCall() {
+            try {
+                // Ensure that localStream is only initialized once
+
+
+
+
+                if (!localStream) {
+
+                    
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        video: videoEnabeled ,  
+                        audio: {
+                            echoCancellation: true,  // Enable echo cancellation
+                            noiseSuppression: true ,  // Enable noise suppression (optional)
+                            autoGainControl:  true       // Enable automatic gain control (optional)
+                        }
+                    }); 
+
+
+                   
+
+                 //   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    document.getElementById('localVideo').srcObject = localStream;
+                   
+                }
+
+                // Check if peerConnection already exists
+                if (!peerConnection) {
+                    peerConnection = createPeerConnection(remoteUserId);
+                    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                }
+
+                // Only set remote description if it hasn't been set yet
+                if (remoteOffer) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteOffer));
+                    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+
+                }
+
+               
+
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+
+
+                connection.invoke("answer", answer, remoteUserId)
+                    .catch(err => console.error(err));
+
+                //=============================================================
+                //====          Mute Micrphone  for 5 sec to avoid Echo
+
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) audioTrack.enabled = false;
+
+                // Enable microphone after 2 seconds
+                setTimeout(() => {
+                    if (audioTrack) audioTrack.enabled = true;
+                    console.log("Microphone enabled after 5 mseconds");
+                }, 500);
+
+
+                // Update button states
+              //  document.getElementById('acceptCallButton').classList.add('disabled');
+             //   document.getElementById('acceptCallButton').disabled = true;
+                document.getElementById('endCallButton').classList.remove('disabled');
+                document.getElementById('endCallButton').disabled = false;
+              //  document.getElementById('startCallButton').classList.add('disabled');
+              //  document.getElementById('startCallButton').disabled = true;
+
+                document.getElementById('acceptCallButton').style.display = 'none';
+                document.getElementById('startCallButton').style.display = 'none';
+            } catch (error) {
+                console.error('Error accepting call:', error);
+            }
+        }
+
+        ////===============   End the Call ================================
+
+
+        async function endCallLocal() {
+
+            await endCall();
+
+            connection.invoke("endCall", remoteUserId)
+                .catch(err => console.error(err));
+
+
+
+        }
+
+        async function endCall() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            document.getElementById('localVideo').srcObject = null;
+            document.getElementById('remoteVideo').srcObject = null;
+
+            // Reset UI buttons
+          //  document.getElementById('startCallButton').classList.remove('disabled');
+          //  document.getElementById('startCallButton').disabled = false;
+            document.getElementById('acceptCallButton').classList.add('disabled');
+            document.getElementById('acceptCallButton').disabled = true;
+         //   document.getElementById('endCallButton').classList.add('disabled');
+         //   document.getElementById('endCallButton').disabled = true;
+
+
+            document.getElementById('acceptCallButton').style.display = 'none';
+            document.getElementById('startCallButton').style.display = 'none';
+            closePage();
+        }
+
+
+
+        //====    Trigerd when Rmote side disconect ======
+        connection.on('RemoteCallEnded', async () => {
+            try {
+                console.log("Call ended from Remote ->")
+                await endCall();
+            } catch (error) {
+                console.error('Error handling answer:', error);
+            }
+        });
+
+        /// ===   Close the Page =======
+        function closePage() {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.close();
+            }
+        }
+
+
+        function goFullScreen() {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen(); // For most browsers
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen(); // For Chrome and Safari
+            } else if (document.documentElement.mozRequestFullScreen) {
+                document.documentElement.mozRequestFullScreen(); // For Firefox
+            } else if (document.documentElement.msRequestFullscreen) {
+                document.documentElement.msRequestFullscreen(); // For IE/Edge
+            }
+        }
+
+        // Add an event listener for any click on the document
+        document.addEventListener('click', function () {
+          //   goFullScreen(); // Trigger full-screen mode on any click
+        });
+
+
+
+        //=======================================
+        const video = document.getElementById('localVideo');
+
+        video.addEventListener('touchstart', function (e) {
+            isDragging = true;
+            // Get the initial position of the touch
+            offsetX = e.touches[0].clientX - video.offsetLeft;
+            offsetY = e.touches[0].clientY - video.offsetTop;
+
+            video.style.cursor = 'grabbing'; // Change cursor to grabbing when dragging
+        });
+
+        video.addEventListener('touchmove', function (e) {
+            if (isDragging) {
+                const touchX = e.touches[0].clientX;
+                const touchY = e.touches[0].clientY;
+
+                // Move the video based on touch movement
+                video.style.left = touchX - offsetX + 'px';
+                video.style.top = touchY - offsetY + 'px';
+            }
+        });
+
+        video.addEventListener('touchend', function () {
+            isDragging = false;
+            video.style.cursor = 'grab'; // Change cursor back to grab after dragging
+        });
+
+        //=======================================
+
+
+
+
+    </script>
+</body>
+</html>

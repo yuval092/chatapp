@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+	<corners android:radius="10dp"/>
+	<!-- Rounded corners -->
+	<solid android:color= "#FFADD8E6"/>
+	<!-- Light blue background color -->
+	<padding
+        android:left="10dp"
+        android:right="10dp"
+        android:top="5dp"
+        android:bottom="5dp"/>
+	<!-- Padding inside the bubble -->
+	<size
+        android:minWidth="50dp"
+        android:maxWidth="200dp"/>
+	<!-- Minimum and maximum width -->
+</shape>

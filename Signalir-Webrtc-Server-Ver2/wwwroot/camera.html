@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Camera Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        video {
+            width: 80%;
+            max-width: 600px;
+            border: 2px solid #333;
+            border-radius: 10px;
+            background: black;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebRTC Camera Access</h1>
+    <video id="video" autoplay playsinline></video>
+    <div class="controls">
+        <button id="startButton">Start Camera</button>
+        <button id="stopButton" disabled>Stop Camera</button>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('video');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        let mediaStream = null;
+
+        async function startCamera() {
+            try {
+                // Request access to the camera
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = mediaStream;
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Could not access the camera. Please check your permissions.');
+            }
+        }
+
+        function stopCamera() {
+            if (mediaStream) {
+                // Stop all tracks to release the camera
+                mediaStream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+            }
+        }
+
+        // Event listeners
+        startButton.addEventListener('click', startCamera);
+        stopButton.addEventListener('click', stopCamera);
+    </script>
+</body>
+</html>

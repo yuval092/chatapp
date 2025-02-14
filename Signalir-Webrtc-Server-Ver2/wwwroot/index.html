@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Current Date and Time</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #date-time {
+            font-size: 2em;
+            margin-top: 10px; /* Space between h1 and date-time */
+        }
+    </style>
+</head>
+<body>
+
+<h1>Amit Farkash Server is Running</h1>
+
+<div id="date-time">Loading date and time...</div>
+
+<script>
+    function updateDateTime() {
+        const now = new Date();
+        const formattedDateTime = now.toLocaleString();
+        document.getElementById('date-time').textContent = formattedDateTime;
+    }
+
+    // Update date and time every second
+    setInterval(updateDateTime, 1000);
+
+    // Initial call to display right away
+    updateDateTime();
+</script>
+
+</body>
+</html>
