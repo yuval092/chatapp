@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:id="@+id/fragment_container"
+    android:layout_height="match_parent"
+     android:background="#caebf0"
+    android:fillViewport="true">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true">
+        <TextView
+            android:id="@+id/name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ChitChat"
+            android:textSize="40sp"
+            android:textAllCaps="false"
+            android:textColor="#299797"
+            android:textStyle="bold"
+            android:fontFamily="cursive"
+            android:layout_centerHorizontal="true"
+             />
+
+
+        <!-- ImageView להצגת תמונה שנבחרה או שצולמה -->
+        <ImageView
+            android:id="@+id/profileImage"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="55dp"
+            android:src="@drawable/profile"/>
+
+        <!-- Layout with buttons in the same row -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_below="@id/profileImage"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp">
+
+            <!-- Button for taking a photo -->
+            <Button
+                android:id="@+id/takePhotoButton"
+                android:layout_width="wrap_content"
+                android:layout_height="50dp"
+                android:text="Take Photo"
+                android:backgroundTint="#30445a"
+                android:textAllCaps="false"
+                android:fontFamily="sans-serif-light"
+                 android:textStyle="bold"
+                android:textSize="14sp"
+
+                android:layout_marginRight="10dp" />
+
+            <!-- Button for selecting a photo from the gallery -->
+            <Button
+                android:id="@+id/galleryButton1"
+                android:layout_width="wrap_content"
+                android:layout_height="50dp"
+                android:textAllCaps="false"
+                android:fontFamily="sans-serif-light" 
+                android:backgroundTint="#30445a"
+                 android:textStyle="bold"
+                android:text="Choose from Gallery"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- טקסט חיבור לשרת -->
+        <TextView
+            android:id="@+id/connectionText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Server Not Connected:"
+            android:textSize="16sp"
+            android:textAllCaps="false"
+            android:layout_below="@id/galleryButton1"
+            android:layout_marginTop="210dp"
+            android:layout_marginBottom="8.5dp"
+            android:layout_alignParentStart="true" />
+
+
+        <ListView
+            android:id="@+id/userListView"
+            android:layout_width="378.0dp"
+            android:layout_height="421.5dp"
+            android:textSize="8sp"
+            android:layout_marginHorizontal="5dp"
+            android:layout_below="@id/connectionText"
+            android:background="#D3D3D3"
+            android:dividerHeight="1dp"
+            android:layout_marginLeft="0.0dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="32.5dp" />
+
+    </RelativeLayout>
+</ScrollView>
