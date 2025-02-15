@@ -10,12 +10,8 @@ using System.Threading.Tasks;
 namespace Signalir_ChatApp
 {
     [Activity(Label = "NewUserRegistration")]
-
     public class NewUserRegistration : Activity
     {
-
-        public BroadcastReceiver broadcastReceiver;
-
         private EditText userNameText;
         private EditText phoneNumberText;
         private EditText passwordText;
@@ -24,115 +20,78 @@ namespace Signalir_ChatApp
         private ImageView home;
         private TextView link;
 
-        //   TaskCompletionSource<string>   אשר מסתיים רק כאשר קורה אירוע TASK יוצרים 
-        //                     במקרה שלנו כאשר הגיע תשובה מהשרת העם המשתמש קיים או לא 
-        private TaskCompletionSource<string> responseCompletionSource;
-
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
 
             SetContentView(Resource.Layout.NewUserRegistration);
 
-            //   הרשמה לארוע של תשובה מהשרת 
-            broadcastReceiver = new SignalRBroadcastReceiver(this);
-            RegisterReceiver(broadcastReceiver, new IntentFilter("BrodcastAddNewUserToDataBaseResults"));
-
-            userNameText = FindViewById<EditText>(Resource.Id.userNameText);
-            phoneNumberText = FindViewById<EditText>(Resource.Id.phoneNumberText);
-            passwordText = FindViewById<EditText>(Resource.Id.passwordText);
             home = FindViewById<ImageView>(Resource.Id.HomeIcon);
             link = FindViewById<TextView>(Resource.Id.loginLink);
-
-            registerButton = FindViewById<Button>(Resource.Id.registerButton);
             cancellButton = FindViewById<Button>(Resource.Id.cancelButton);
-            home.Click += Home_Click;
+            userNameText = FindViewById<EditText>(Resource.Id.userNameText);
+            passwordText = FindViewById<EditText>(Resource.Id.passwordText);
+            registerButton = FindViewById<Button>(Resource.Id.registerButton);
+            phoneNumberText = FindViewById<EditText>(Resource.Id.phoneNumberText);
+
+            // נגדיר מה יקרה בעת לחיצה על אחד מהכפתורים או תמונות
             link.Click += Link_Click;
-
-
-            //   כפתור הרשמה נלחץ
-            registerButton.Click += async (sender, e) =>
-            {
-
-
-                if (!string.IsNullOrEmpty(userNameText.Text) && !string.IsNullOrEmpty(phoneNumberText.Text))
-
-
-                    if (SignalRHub.Connection.State == HubConnectionState.Connected)
-                    {
-
-                        // שמחכה לסיום הארוע TASK הפעלת ה 
-                        responseCompletionSource = new TaskCompletionSource<string>();
-
-                        //   broadcast receiver  רישום 
-                        var receiver = new SignalRBroadcastReceiver(this);
-                        Application.Context.RegisterReceiver(receiver, new IntentFilter("BrodcastAddNewUserToDataBaseResults"));
-
-
-                        string user = userNameText.Text;
-                        string phonenumber = phoneNumberText.Text;
-                        string password = passwordText.Text;
-                        await SignalRHub.Connection.InvokeAsync("AddNewUserToDataBase", user, phonenumber,password);
-
-
-                      //   מחכים לתשובה מהשרת  
-                         string userNameExistInDataBase = await responseCompletionSource.Task;
-
-                        // מבטלים הרשמה לאירוע
-                        Application.Context.UnregisterReceiver(receiver);
-
-
-
-                        if (userNameExistInDataBase == "UserAllreadyExist")
-                            {
-                                Toast.MakeText(this, "This User is Already Exist !!", ToastLength.Long).Show();
-                                userNameExistInDataBase = "";
-                            }
-
-                            if (userNameExistInDataBase == "UserSuccessfullyRegistered")
-
-                            {
-                                //  מצא את השם של האפליקציה
-                                string appName = Resources.GetString(Resource.String.app_name);
-
-                                var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
-                                var editor = prefs.Edit();
-                                 //    מוחק שם משתמש קיים רק לצורך בדיקות
-                                editor.Remove("UserName");
-                                editor.PutString("UserName", userNameText.Text);
-                                editor.Apply();
-                                await SignalRHub.Connection.InvokeAsync("RegisterUser", userNameText.Text);
-                                userNameText.Text = "";
-                                phoneNumberText.Text = "";
-                                userNameExistInDataBase = "";
-                                Toast.MakeText(this, "User successfully registered", ToastLength.Long).Show();
-
-                            Finish();
-
-                            }
-                            
-                        }
-
-                    
-
-            };
-
-
-            cancellButton.Click += async (sender, e) =>
-            {
-
-                Finish();
-
-            };
-
-
-
-
+            home.Click += Home_Click;
+            cancellButton.Click += Cancel_Click;
+            registerButton.Click += Register_Click;
         }
+
+        private void Register_Click(object sender, EventArgs e)
+        {
+            //  בדוק אם אחד מהשדות ריק
+            if (string.IsNullOrEmpty(userNameText.Text) || string.IsNullOrEmpty(phoneNumberText.Text) || string.IsNullOrEmpty(passwordText.Text))
+            {
+                Toast.MakeText(this, "Username or Phone or Password is empty", ToastLength.Long).Show();
+                return; // צא מהפונקציה
+            }
+
+            if (SignalRHub.Connection.State == HubConnectionState.Connected)
+            {
+                // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
+                string user = userNameText.Text;
+                string phonenumber = phoneNumberText.Text;
+                string password = passwordText.Text;
+                string result = await SignalRHub.Connection.InvokeAsync<string>(
+                    "RegisterNewUser",
+                    user,
+                    phonenumber,
+                    password
+                );
+
+                if (result == "Success")
+                {
+                    Toast.MakeText(this, "User Registered Successfully", ToastLength.Long).Show();
+
+                    // שמור את שם המשתמש במכשיר בשביל שימושים עתידיים
+                    // בתוך shared preferences
+                    // string appName = Resources.GetString(Resource.String.app_name);
+                    // var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
+                    // var editor = prefs.Edit();
+                    // editor.PutString("UserName", userNameText.Text);
+                    // editor.Apply();
+
+                    // חזור לחלון הקודם
+                    Finish();
+                }
+                else if (result == "UserExists")
+                {
+                    Toast.MakeText(this, "This User Already Exists !!", ToastLength.Long).Show();
+                }
+            }
+            else
+            {
+                Toast.MakeText(this, "Server Is Not Connected !!", ToastLength.Long).Show();
+            }
+        }
+
         private void Home_Click(object sender, EventArgs e)
         {
-            Intent intent = new Intent(this, typeof(MainActivity));
-            StartActivity(intent);
+            Finish();
         }
         private void Link_Click(object sender, EventArgs e)
         {
@@ -140,42 +99,9 @@ namespace Signalir_ChatApp
             StartActivity(intent);
         }
 
-
-
-        private class SignalRBroadcastReceiver : BroadcastReceiver
+        private void Cancel_Click(object sender, EventArgs e)
         {
-
-            private readonly NewUserRegistration contextAactivity;
-
-            public SignalRBroadcastReceiver(NewUserRegistration activity)
-            {
-                contextAactivity = activity;
-            }
-            public override void OnReceive(Context context, Android.Content.Intent intent)
-            {
-                string action = intent.Action;
-
-                switch (action)
-                {
-
-                    case "BrodcastAddNewUserToDataBaseResults":
-                        string user = intent.GetStringExtra("User");
-                        string message = intent.GetStringExtra("Message");
-                        contextAactivity.responseCompletionSource?.TrySetResult(message);
-
-                        break;
-
-
-
-
-                }
-            }
-
+            Finish();
         }
-
-
-
-
     }
-
 }

@@ -38,7 +38,6 @@ namespace Signalir_ChatApp
         private TextView conectionText;
         private ListView listView;
         private ConectionAdapter adapter;
-        // private TextView remoteUserID;
         public static string localUserRegestrationName;
         private List<ImageView> lst;
 
@@ -87,10 +86,6 @@ namespace Signalir_ChatApp
             btn = (Button)FindViewById(Resource.Id.takePhotoButton);
             iv = (ImageView)FindViewById(Resource.Id.profileImage);
             galleryButton = (Button)FindViewById(Resource.Id.galleryButton1);
-            
-           
-            btn.Click += Btn_Click;
-
 
 
 
@@ -116,7 +111,6 @@ namespace Signalir_ChatApp
                 RegisterReceiver(broadcastReceiver, new IntentFilter("ResetConection"));
                 RegisterReceiver(broadcastReceiver, new IntentFilter("ReceiveMessage"));
                 RegisterReceiver(broadcastReceiver, new IntentFilter("UpdateUserList"));
-                RegisterReceiver(broadcastReceiver, new IntentFilter("getRemoteUserIdFromServer"));
                 RegisterReceiver(broadcastReceiver, new IntentFilter("OpenWebrtcPage"));
                 RegisterReceiver(broadcastReceiver, new IntentFilter("FileWatingToDownload"));
 
@@ -126,6 +120,8 @@ namespace Signalir_ChatApp
 
             usersListdDbHelper = new DatabaseHelper(Android.App.Application.Context);
             // יוצרים אובייקט עוזר לחיבור ל-SQLite לצורך ניהול משתמשים
+
+            btn.Click += Btn_Click;
 
             galleryButton.Click += (sender, e) =>
             {
@@ -188,159 +184,159 @@ namespace Signalir_ChatApp
 
             ReadUserNamefromDataBase();
             // טוענים את שם המשתמש מהבסיס נתונים
-    }
+        }
 
-            private string SaveImageToSpecificFolder(Android.Graphics.Bitmap bitmap)
+        private string SaveImageToSpecificFolder(Android.Graphics.Bitmap bitmap)
+        {
+            // פונקציה לשמירת תמונה בתיקייה מוגדרת
+
+            string myChatFolderPath = System.IO.Path.Combine(
+                Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads).AbsolutePath,
+                "MyChat", "ProfilePictures");
+            // מגדירים את הנתיב לתיקייה בתוך תיקיית ההורדות
+
+            if (!Directory.Exists(myChatFolderPath))
             {
-                // פונקציה לשמירת תמונה בתיקייה מוגדרת
+                // אם התיקייה לא קיימת, יוצרים אותה
+                Directory.CreateDirectory(myChatFolderPath);
+            }
 
-                string myChatFolderPath = System.IO.Path.Combine(
-                    Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads).AbsolutePath,
-                    "MyChat", "ProfilePictures");
-                // מגדירים את הנתיב לתיקייה בתוך תיקיית ההורדות
+            string bitmapHash = GetImageHash(bitmap);
+            // יוצרים Hash ייחודי לתמונה
 
-                if (!Directory.Exists(myChatFolderPath))
+            string timestamp = DateTime.Now.ToString("HHmmss");
+            // יוצרים Timestamp ייחודי לקובץ לפי שעה, דקות ושניות
+
+            string fileName = $"profile_{timestamp}.jpg";
+            // יוצרים שם ייחודי לקובץ
+
+            string filePath = System.IO.Path.Combine(myChatFolderPath, fileName);
+            // מגדירים את הנתיב המלא לקובץ
+
+            if (!File.Exists(filePath))
+            {
+                // אם הקובץ לא קיים, שומרים אותו כ-JPG
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    bitmap.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg, 100, stream);
+                }
+            }
+
+            return filePath;
+            // מחזירים את הנתיב של התמונה שנשמרה
+        }
+
+        private string GetImageHash(Android.Graphics.Bitmap bitmap)
+        {
+            // פונקציה ליצירת Hash לתמונה
+
+            using (var stream = new MemoryStream())
+            {
+                bitmap.Compress(Android.Graphics.Bitmap.CompressFormat.Png, 100, stream);
+                // דוחסים את התמונה לפורמט PNG
+
+                byte[] imageBytes = stream.ToArray();
+                // ממירים את התמונה למערך בתים
+
+                using (var sha256 = System.Security.Cryptography.SHA256.Create())
+                {
+                    byte[] hashBytes = sha256.ComputeHash(imageBytes);
+                    // יוצרים Hash לתמונה בעזרת SHA-256
+
+                    return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+                    // ממירים את ה-Hash ל-String
+                }
+            }
+        }
+
+        public static void ShowFullScalePhoto(Activity activity, string imagePath)
+        {
+            // פונקציה להצגת תמונה בגודל מלא במסך
+
+            var fragmentTransaction = activity.FragmentManager.BeginTransaction();
+            var fragment = new FullScreenImageFragment(imagePath);
+            // יוצרים את פרגמנט התמונה בגודל מלא
+
+            fragmentTransaction.Replace(Android.Resource.Id.Content, fragment);
+            fragmentTransaction.AddToBackStack(null);
+            fragmentTransaction.Commit();
+            // מציגים את התמונה בגודל מלא בפרגמנט
+        }
+
+        public static async Task<string> SaveFileToDownloadsAsync(string recivingUserName, string sendingUserName, string fileUrl)
+        {
+            // פונקציה לשמירת קובץ מהאינטרנט לתיקיית ההורדות
+
+            try
+            {
+                string fileName = fileUrl.Substring(fileUrl.LastIndexOf('/') + 1);
+                // מקבלים את שם הקובץ מתוך כתובת ה-URL
+
+                string downloadsPath = System.IO.Path.Combine(Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads).AbsolutePath, "MyChat", "Profile");
+                // מגדירים את הנתיב לתיקיית ההורדות בתוך תיקיית "MyChat"
+
+                if (!Directory.Exists(downloadsPath))
                 {
                     // אם התיקייה לא קיימת, יוצרים אותה
-                    Directory.CreateDirectory(myChatFolderPath);
+                    Directory.CreateDirectory(downloadsPath);
                 }
 
-                string bitmapHash = GetImageHash(bitmap);
-                // יוצרים Hash ייחודי לתמונה
-
-                string timestamp = DateTime.Now.ToString("HHmmss");
-                // יוצרים Timestamp ייחודי לקובץ לפי שעה, דקות ושניות
-
-                string fileName = $"profile_{timestamp}.jpg";
-                // יוצרים שם ייחודי לקובץ
-
-                string filePath = System.IO.Path.Combine(myChatFolderPath, fileName);
+                string filePath = System.IO.Path.Combine(downloadsPath, fileName);
                 // מגדירים את הנתיב המלא לקובץ
 
-                if (!File.Exists(filePath))
+                var handler = new HttpClientHandler
                 {
-                    // אם הקובץ לא קיים, שומרים אותו כ-JPG
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        bitmap.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg, 100, stream);
-                    }
+                    // מבטלים את בדיקת האישורים של השרת לצורך בדיקות
+                    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+                };
+
+                using (var httpClient = new HttpClient(handler))
+                {
+                    var fileBytes = await httpClient.GetByteArrayAsync(fileUrl);
+                    // מורידים את הקובץ מהשרת
+
+                    System.IO.File.WriteAllBytes(filePath, fileBytes);
+                    // שומרים את הקובץ בתיקייה
+
+                    Toast.MakeText(Android.App.Application.Context, $"File saved to: {filePath}", ToastLength.Long).Show();
+                    // מציגים הודעה שהקובץ נשמר
                 }
 
                 return filePath;
-                // מחזירים את הנתיב של התמונה שנשמרה
+                // מחזירים את הנתיב של הקובץ שנשמר
             }
-
-            private string GetImageHash(Android.Graphics.Bitmap bitmap)
+            catch (Exception ex)
             {
-                // פונקציה ליצירת Hash לתמונה
-
-                using (var stream = new MemoryStream())
-                {
-                    bitmap.Compress(Android.Graphics.Bitmap.CompressFormat.Png, 100, stream);
-                    // דוחסים את התמונה לפורמט PNG
-
-                    byte[] imageBytes = stream.ToArray();
-                    // ממירים את התמונה למערך בתים
-
-                    using (var sha256 = System.Security.Cryptography.SHA256.Create())
-                    {
-                        byte[] hashBytes = sha256.ComputeHash(imageBytes);
-                        // יוצרים Hash לתמונה בעזרת SHA-256
-
-                        return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
-                        // ממירים את ה-Hash ל-String
-                    }
-                }
+                Toast.MakeText(Android.App.Application.Context, $"Error: {ex.Message}", ToastLength.Long).Show();
+                // מציגים הודעת שגיאה אם הייתה בעיה בשמירת הקובץ
+                return null;
             }
+        }
 
-            public static void ShowFullScalePhoto(Activity activity, string imagePath)
+        private void Btn_Click(object sender, System.EventArgs e)
+        {
+            // כאשר לוחצים על הכפתור, מבקשים הרשאות למצלמה ולזיכרון אם הן לא קיימות
+            if (ContextCompat.CheckSelfPermission(this, Manifest.Permission.Camera) != (int)Permission.Granted ||
+                ContextCompat.CheckSelfPermission(this, Manifest.Permission.WriteExternalStorage) != (int)Permission.Granted ||
+                ContextCompat.CheckSelfPermission(this, Manifest.Permission.ReadExternalStorage) != (int)Permission.Granted)
             {
-                // פונקציה להצגת תמונה בגודל מלא במסך
-
-                var fragmentTransaction = activity.FragmentManager.BeginTransaction();
-                var fragment = new FullScreenImageFragment(imagePath);
-                // יוצרים את פרגמנט התמונה בגודל מלא
-
-                fragmentTransaction.Replace(Android.Resource.Id.Content, fragment);
-                fragmentTransaction.AddToBackStack(null);
-                fragmentTransaction.Commit();
-                // מציגים את התמונה בגודל מלא בפרגמנט
-            }
-
-            public static async Task<string> SaveFileToDownloadsAsync(string recivingUserName, string sendingUserName, string fileUrl)
-            {
-                // פונקציה לשמירת קובץ מהאינטרנט לתיקיית ההורדות
-
-                try
+                // אם ההרשאות אינן קיימות, מבקשים אותן מהמשתמש
+                ActivityCompat.RequestPermissions(this, new String[]
                 {
-                    string fileName = fileUrl.Substring(fileUrl.LastIndexOf('/') + 1);
-                    // מקבלים את שם הקובץ מתוך כתובת ה-URL
-
-                    string downloadsPath = System.IO.Path.Combine(Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads).AbsolutePath, "MyChat", "Profile");
-                    // מגדירים את הנתיב לתיקיית ההורדות בתוך תיקיית "MyChat"
-
-                    if (!Directory.Exists(downloadsPath))
-                    {
-                        // אם התיקייה לא קיימת, יוצרים אותה
-                        Directory.CreateDirectory(downloadsPath);
-                    }
-
-                    string filePath = System.IO.Path.Combine(downloadsPath, fileName);
-                    // מגדירים את הנתיב המלא לקובץ
-
-                    var handler = new HttpClientHandler
-                    {
-                        // מבטלים את בדיקת האישורים של השרת לצורך בדיקות
-                        ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
-                    };
-
-                    using (var httpClient = new HttpClient(handler))
-                    {
-                        var fileBytes = await httpClient.GetByteArrayAsync(fileUrl);
-                        // מורידים את הקובץ מהשרת
-
-                        System.IO.File.WriteAllBytes(filePath, fileBytes);
-                        // שומרים את הקובץ בתיקייה
-
-                        Toast.MakeText(Android.App.Application.Context, $"File saved to: {filePath}", ToastLength.Long).Show();
-                        // מציגים הודעה שהקובץ נשמר
-                    }
-
-                    return filePath;
-                    // מחזירים את הנתיב של הקובץ שנשמר
-                }
-                catch (Exception ex)
-                {
-                    Toast.MakeText(Android.App.Application.Context, $"Error: {ex.Message}", ToastLength.Long).Show();
-                    // מציגים הודעת שגיאה אם הייתה בעיה בשמירת הקובץ
-                    return null;
-                }
-            }
-
-            private void Btn_Click(object sender, System.EventArgs e)
-            {
-                // כאשר לוחצים על הכפתור, מבקשים הרשאות למצלמה ולזיכרון אם הן לא קיימות
-                if (ContextCompat.CheckSelfPermission(this, Manifest.Permission.Camera) != (int)Permission.Granted ||
-                    ContextCompat.CheckSelfPermission(this, Manifest.Permission.WriteExternalStorage) != (int)Permission.Granted ||
-                    ContextCompat.CheckSelfPermission(this, Manifest.Permission.ReadExternalStorage) != (int)Permission.Granted)
-                {
-                    // אם ההרשאות אינן קיימות, מבקשים אותן מהמשתמש
-                    ActivityCompat.RequestPermissions(this, new String[]
-                    {
             Manifest.Permission.Camera,
             Manifest.Permission.WriteExternalStorage,
             Manifest.Permission.ReadExternalStorage
-                }, 0);
+            }, 0);
             }
             else // if we already have the premissions
             {
-                
+
                 StartCamera();
             }
-            
+
         }
 
-        
+
         private void StartCamera() // allow start the camera
         {
             setPermissions();
@@ -354,14 +350,14 @@ namespace Signalir_ChatApp
             {
                 // We can read and write the media
                 mExternalStorageAvailable = mExternalStorageWriteable = true;
-                
+
             }
             else if (Android.OS.Environment.MediaMountedReadOnly.Equals(state))
             {
                 // We can only read the media
                 mExternalStorageAvailable = true;
                 mExternalStorageWriteable = false;
-                
+
             }
             else
             {
@@ -609,87 +605,9 @@ namespace Signalir_ChatApp
             //  Main Activty  got Foocous 
             MainactivtyFocoused = true;
 
-
-            string appName = Resources.GetString(Resource.String.app_name);
-
-            var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
-
-            //  טען את שם המשתמש ו כתובת איפי שך השרת מהפרפרנס
-            string savedUserName = prefs.GetString("UserName", "NotRegistration");
-            string savedServerIpAdress = prefs.GetString("IpAdress", "NoServerIp");
-
-
-
-            if ((savedUserName != "NotRegistration") && (savedUserName != null))
-            {
-                localUserRegestrationName = prefs.GetString("UserName", "NotRegistration");
-            }
-
-            if ((savedServerIpAdress != "NoServerIp") && (savedServerIpAdress != null))
-            {
-                SignalRHub.remoteServerIp = savedServerIpAdress;
-            }
-            else SignalRHub.remoteServerIp = "farkash-amit.tplinkdns.com:5000";
-
-
-            if (SignalRHub.Connection != null)
-            {
-
-                //    הסרוויס מחובר לשרת
-                if (SignalRHub.Connection.State == HubConnectionState.Connected)
-
-                {
-
-
-                    string connectionId = SignalRHub.Connection.ConnectionId;
-
-                    try
-                    {
-
-                        // שמחכה לסיום הארוע TASK הפעלת ה 
-                        responseCompletionSource = new TaskCompletionSource<string>();
-
-                        //   broadcast receiver  רישום 
-                        var receiver = new SignalRBroadcastReceiver(this);
-                        Application.Context.RegisterReceiver(receiver, new IntentFilter("getRemoteUserIdFromServer"));
-
-                        LocalUserExistOnServer = true;
-                        await SignalRHub.Connection.InvokeAsync("getRemoteUserId", localUserRegestrationName);
-
-                        string answer = await responseCompletionSource.Task;
-
-                        // מבטלים הרשמה לאירוע
-                        Application.Context.UnregisterReceiver(receiver);
-
-
-
-                        if (answer == "UserNotExist")
-                        {
-                            await SignalRHub.Connection.InvokeAsync("RegisterUser", localUserRegestrationName);
-
-                        }
-                        //  if (LocalUserExistOnServer == true)
-                        if (answer == "UserExist")
-                        {
-                            await SignalRHub.Connection.InvokeAsync("UpdateUserList");
-
-                            UpdateConnectedUserList();
-                            UpdateConectionStatus(connectionId);
-                        }
-
-                    }
-                    catch (System.Exception e)
-                    {
-                        Console.WriteLine(e);
-                    }
-
-
-                }
-
-            }
+            // תבדוק מה המצב עם השרת, האם אנחנו מחוברים או לא?
+            UpdateConnectionStatus();
         }
-
-
 
         protected override void OnPause()
         {
@@ -747,65 +665,51 @@ namespace Signalir_ChatApp
 
         }
 
-        //     עדכון הטלפון התחבר לשרת
-        public void UpdateConectionStatus(string connectionId)
+        public void UpdateConnectionStatus()
         {
-            RunOnUiThread(async () =>
+
+            // האם המשתמש כבר התחבר עם שם משתמש וסיסמה?
+            // במידה וכן, עדכן במסך כי המכשיר התחבר לשרת בהצלחה.
+            // אחרת, עדכן כי על המשתמש להתחבר עם שם משתמש וסיסמה לפני שיוכל לעשות משהו.
+
+            conectionText = FindViewById<TextView>(Resource.Id.connectionText);
+            if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
             {
+                // נבדוק אם כבר ביצענו login
+                string result = await SignalRHub.Connection.InvokeAsync<string>("IsLoginComplete");
 
-
-                conectionText = FindViewById<TextView>(Resource.Id.connectionText);
-                conectionText.Text = localUserRegestrationName + " OnLine";
-
-                conectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
-
-
-                try
+                if (string.IsNullOrEmpty(result))
                 {
-                    LocalUserExistOnServer = true;
-
-                    // שמחכה לסיום הארוע TASK הפעלת ה 
-                    responseCompletionSource = new TaskCompletionSource<string>();
-
-                    //   broadcast receiver  רישום 
-                    var receiver = new SignalRBroadcastReceiver(this);
-                    Application.Context.RegisterReceiver(receiver, new IntentFilter("getRemoteUserIdFromServer"));
-
-                    await SignalRHub.Connection.InvokeAsync("getRemoteUserId", localUserRegestrationName);
-
-
-                    string answer = await responseCompletionSource.Task;
-
-                    // מבטלים הרשמה לאירוע
-                    Application.Context.UnregisterReceiver(receiver);
-
-                    if (answer == "UserNotExist" && localUserRegestrationName != null)
-
-                    // if (LocalUserExistOnServer == false)
-                    {
-                        await SignalRHub.Connection.InvokeAsync("RegisterUser", localUserRegestrationName);
-
-                        conectionText = FindViewById<TextView>(Resource.Id.connectionText);
-                        conectionText.Text = " " + localUserRegestrationName + "   Is Online ";
-                        conectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
-
-
-                    }
-
-
+                    // ERROR!!
+                    Toast.MakeText(Android.App.Application.Context, $"Failed to call 'IsLoginComplete'.", ToastLength.Long).Show();
                 }
-                catch (System.Exception e)
+                if (result == "NoLogin")
                 {
-                    Console.WriteLine(e);
+                    conectionText.Text = "Connected To Server, Please Login!";
+                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightBlue);
                 }
-
-
-
-
-
-
-
-            });
+                else
+                {
+                    localUserRegestrationName = result;
+                    conectionText.Text = $"Connected To Server, User: {localUserRegestrationName}";
+                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
+                }
+            }
+            else
+            {
+                if (SignalRHub.Connection == null || !SignalRHub.startedRunning)
+                {
+                    // עדיין לא התחיל לרוץ הservice.
+                    conectionText.Text = "Not Connected To Server (Service Not Running)!";
+                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightRed);
+                }
+                else
+                {
+                    // המכשיר לא מחובר אל השרת. עדכן זאת בממשק המשתמש.
+                    conectionText.Text = "Not Connected To Server (Service Running)!";
+                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightRed);
+                }
+            }
         }
 
         //   עדכון משתמשים מחוברים
@@ -974,7 +878,7 @@ namespace Signalir_ChatApp
         {
 
             // UI -כדי למנוע תקיעה של ה  UI פונקצית עזר של אנדרואיד - להריץ את הפקודות ב
-            RunOnUiThread(() => 
+            RunOnUiThread(() =>
             {
                 string userPrams1 = "webrtc-" + localUserRegestrationName;
                 string userPrams2 = "webrtc-" + remoteUser;
@@ -995,7 +899,7 @@ namespace Signalir_ChatApp
 
 
                     }
-                    
+
                     if (play == "Call")
                     {
 
@@ -1007,7 +911,7 @@ namespace Signalir_ChatApp
                         // param4 = audioOrVideo 
                         //   string url = $"https://farkash-amit.tplinkdns.com:5000/webrtcchat.html#param1={userPrams1}&param2={userPrams2}&param3=Call";
                         string url = $"https://" + SignalRHub.remoteServerIp + $"/test.html#param1={userPrams1}&param2={userPrams2}&param3=Call&param4={audioOrVideo}";
-                        
+
 
                         OpenWebPageWithCustomTab(url);
 
@@ -1082,11 +986,11 @@ namespace Signalir_ChatApp
             //  הנוכחי כדי לאפשר גישה   activty חייבים להעביר את ה   
             //  MainActivty  למחלקה הראשית 
 
-            private readonly MainActivity contextAactivity;
+            private readonly MainActivity contextActivity;
 
             public SignalRBroadcastReceiver(MainActivity activity)
             {
-                contextAactivity = activity;
+                contextActivity = activity;
             }
             public override void OnReceive(Context context, Android.Content.Intent intent)
             {
@@ -1096,19 +1000,14 @@ namespace Signalir_ChatApp
                 {
 
                     case "StatusUpdate":
-                        string message = intent.GetStringExtra("Message");
-                        string connectionId = intent.GetStringExtra("ConnectionId");
-
-                        contextAactivity.UpdateConectionStatus(connectionId);
-
+                        contextActivity.UpdateConnectionStatus();
                         break;
-
 
                     case "ResetConection":
                         if (MainactivtyFocoused == true)
                         {
                             //    הסימן מסמן  _  שאנו לא רוצים לחכות לתשובה 
-                            _ = contextAactivity.ResetService(signalRServiceIntent);
+                            _ = contextActivity.ResetService(signalRServiceIntent);
                         }
                         break;
 
@@ -1117,7 +1016,7 @@ namespace Signalir_ChatApp
                         string sendingUserName = intent.GetStringExtra("SendingUser");
                         string recivingUserName = intent.GetStringExtra("RecivingUser");
 
-                        contextAactivity.UpdateRecivedMessage(sendingUserName, recivingUserName, message);
+                        contextActivity.UpdateRecivedMessage(sendingUserName, recivingUserName, message);
 
 
 
@@ -1126,28 +1025,7 @@ namespace Signalir_ChatApp
 
                     case "UpdateUserList":
 
-                        contextAactivity.UpdateConnectedUserList();
-
-                        break;
-
-                    case "getRemoteUserIdFromServer":
-                        string userName = intent.GetStringExtra("UserName");
-                        string userId = intent.GetStringExtra("UserId");
-                        if (userName != "UserNotExist")
-                        {
-                            LocalUserExistOnServer = true;
-                            // contextAactivity.UpdateRemoteUserId(userName, userId);
-                            contextAactivity.responseCompletionSource?.TrySetResult("UserExist");
-                        }
-                        else
-                        {
-                            LocalUserExistOnServer = false;
-                            contextAactivity.responseCompletionSource?.TrySetResult("UserNotExist");
-
-                        }
-
-
-
+                        contextActivity.UpdateConnectedUserList();
 
                         break;
 
@@ -1158,7 +1036,7 @@ namespace Signalir_ChatApp
                             string webRtcUser = intent.GetStringExtra("RemoteUser");
                             string play = intent.GetStringExtra("Play");
                             string audioOrVideo = intent.GetStringExtra("AudioOrVideo");
-                            contextAactivity.OpenWebRtcPage(webRtcUser, play, audioOrVideo);
+                            contextActivity.OpenWebRtcPage(webRtcUser, play, audioOrVideo);
                         }
 
 
@@ -1172,7 +1050,7 @@ namespace Signalir_ChatApp
                         string portraitOrlandscape = intent.GetStringExtra("PortraitOrlandscape");
                         string filetype = intent.GetStringExtra("FileType");
 
-                        contextAactivity.DownloadFile(recivingUserName, sendingUserName, fileUrl, portraitOrlandscape, filetype);
+                        contextActivity.DownloadFile(recivingUserName, sendingUserName, fileUrl, portraitOrlandscape, filetype);
 
                         break;
 

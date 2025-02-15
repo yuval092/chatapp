@@ -17,6 +17,7 @@ namespace Signalir_ChatApp
         public static HubConnection Connection { get; set; }
         public static bool CallIsActive = false;
         public static string remoteServerIp;
+        public static bool startedRunning = false;
 
     }
 
@@ -24,7 +25,7 @@ namespace Signalir_ChatApp
     [Service]
     public class SignalRService : Service
     {
-        public static  HubConnection hubConnection;
+        public static HubConnection hubConnection;
         private static bool isServiceRunning = false;
 
         // add for test 
@@ -37,22 +38,24 @@ namespace Signalir_ChatApp
         // cancellation היא מאפשרת ליצור ולהפיץ אסימוני ביטול 
         // המשמשת לביצוע וניהול ביטול של משימות אסינכרוניות
         // שניתן להשתמש בהם על מנת לעצור פעולות אשר רצות
-        public static bool ServerIsAlive = false ;
+        public static bool ServerIsAlive = false;
         public override void OnCreate()
         {
             base.OnCreate();
+
+            SignalRHub.startedRunning = false;
             InitializeService();
-
-           
-
         }
 
-
         //============================================
-        private async void InitializeService()
+        private static async void InitializeService()
         {
             // Initialize SignalR connection, create notification channel, etc.
-            InitializeSignalR();
+            while (!InitializeSignalR())
+            {
+                // לא הצלחנו לבצע אתחול. נישן קצת וננסה שוב.
+                Thread.Sleep(1000);
+            }
             CreateNotificationChannel();
 
             // Start the SignalR connection if it isn't running already
@@ -63,55 +66,42 @@ namespace Signalir_ChatApp
                 Thread.Sleep(1000);
                 StartKeepAliveAsync();
 
-                
                 // Create and show the foreground notification
                 var notification = CreateForegroundNotification("SignalR Service", "Running in the background");
                 StartForeground(NotificationId, notification);
                 isServiceRunning = true;
+                SignalRHub.startedRunning = true;
             }
         }
 
         //=============================================
-        
 
-
-
-
-        private static  void InitializeSignalR()
+        private static bool InitializeSignalR()
         {
+            // תבדוק האם הגדרנו לאיזה שרת להתחבר
+            string appName = Application.Context.Resources.GetString(Resource.String.app_name);
+            var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
+            string savedIpAddress = prefs.GetString("IpAdress", "NoServerIp");
+            if (string.IsNullOrEmpty(savedIpAddress) || savedIpAddress == "NoServerIp")
+            {
+                Console.WriteLine("Can't connect to server - IP address not configured.");
+                return false;
+            }
+
+            // מעולה. עכשיו אפשר להתחבר לשרת!
+
             var handler = new HttpClientHandler
             {
                 // Bypasses SSL validation - always returns true regardless of certificate validity
                 ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
             };
 
+            // תגדיר מה הכתובת של השרת, כך שנצליח להתחבר אליו
+            string connectionURL = "https://" + savedIpAddress + "/echohub";
 
-            string appName = Application.Context.Resources.GetString(Resource.String.app_name);
-
-            var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
-            string savedServerIpAdress = prefs.GetString("IpAdress", "NoServerIp");
-            string connectionIp = "";
-
-
-            if ((savedServerIpAdress != "NoServerIp") && (savedServerIpAdress != null))
-            {
-                savedServerIpAdress = prefs.GetString("IpAdress", "NoServerIp");
-                connectionIp = "https://" + savedServerIpAdress + "/echohub";
-            }
-            else
-            {
-                  connectionIp = "https://farkash-amit.tplinkdns.com:5000/echoHub";
-                  
-
-            }
-
-
-            // "http://192.168.0.111:3000/echoHub"
             // Create the SignalR connection with HTTPS and SSL validation bypass
             hubConnection = new HubConnectionBuilder()
-                //  .WithUrl("https://farkash-amit.tplinkdns.com:5000/echoHub", options =>
-                // .WithUrl("https://192.168.0.111:5000/echoHub", options =>
-                .WithUrl(connectionIp, options =>
+                .WithUrl(connectionURL, options =>
                 {
                     options.HttpMessageHandlerFactory = _ => handler;
 
@@ -121,11 +111,12 @@ namespace Signalir_ChatApp
 
             // Assign the connection to the shared SignalRHub class
             SignalRHub.Connection = hubConnection;
+            return true;
         }
 
 
         //===========================================================
-        private  async Task ConnectToSignalRHub()
+        private async Task ConnectToSignalRHub()
         {
             try
             {
@@ -134,43 +125,29 @@ namespace Signalir_ChatApp
                 var connectionId = hubConnection.ConnectionId;
                 BroadcastConnectionStatus("StatusUpdate", "Connected to server ->", connectionId);
 
-                //await Clients.Client(connectionId).SendAsync("ReceiveMessage", sendingUser, recivingUser, message);
-
 
                 hubConnection.On<string, string, string>("ReceiveMessage", (sendingUser, recivingUser, message) =>
                 {
                     BroadcastMessage("ReceiveMessage", sendingUser, recivingUser, message);
-
-                                       
-
                 });
-
-
-
-                hubConnection.On<string, string>("getRemoteUserIdFromServer", (userName, userId) =>
-                {
-                    BroadcastRemoteUserInfo(userName, userId);
-                });
-
 
                 hubConnection.On<string, List<ConnectedUser>>("UpdateUserList", (userName, userList) =>
                 {
-
                     TransferUserListManager.UpdateUserList(userList);
                     BrodcastUpdateUserList(userName, userList);
                 });
 
                 //    בקשה לשיחת וידאו התקבלה
-                hubConnection.On<string, string , string>("OpenWebrtcPage", (remoteUser, play ,audioOrVideo) =>
+                hubConnection.On<string, string, string>("OpenWebrtcPage", (remoteUser, play, audioOrVideo) =>
                 {
-                    if (play == "Call") BrodcastOpenWebrtcPage(remoteUser, play,audioOrVideo);
+                    if (play == "Call") BrodcastOpenWebrtcPage(remoteUser, play, audioOrVideo);
                     if (play == "Answer")
                     {
                         string incomingMessage = "Video call from :" + remoteUser;
                         ShowNotification(incomingMessage, "");
 
-                        if (user_detailed.User_DetailedactivtyFocoused) BrodcastOpenWebrtcPage(remoteUser, play,audioOrVideo);
-                        if (MainActivity.MainactivtyFocoused) BrodcastOpenWebrtcPage(remoteUser, play,audioOrVideo);
+                        if (user_detailed.User_DetailedactivtyFocoused) BrodcastOpenWebrtcPage(remoteUser, play, audioOrVideo);
+                        if (MainActivity.MainactivtyFocoused) BrodcastOpenWebrtcPage(remoteUser, play, audioOrVideo);
                         else
                         {
 
@@ -188,11 +165,11 @@ namespace Signalir_ChatApp
                                 }
 
 
-                                BrodcastOpenWebrtcPage(remoteUser, play,audioOrVideo);
+                                BrodcastOpenWebrtcPage(remoteUser, play, audioOrVideo);
                             });
 
                         }
-                    } 
+                    }
                 });
 
                 //    השרת מחובר
@@ -201,29 +178,21 @@ namespace Signalir_ChatApp
                     ServerIsAlive = true;
                 });
 
-
                 hubConnection.On<string, string>("AddNewUserToDataBaseResults", (user, message) =>
                 {
                     BrodcastAddNewUserToDataBaseResults(user, message);
                 });
 
                 //   קובץ מוכן להורדה 
-                hubConnection.On<string, string ,string,string,string>("FileWaitingForDownload", (recivingUserName, sendingUserName, fileUrl , portraitOrlandscape, fileType) =>
+                hubConnection.On<string, string, string, string, string>("FileWaitingForDownload", (recivingUserName, sendingUserName, fileUrl, portraitOrlandscape, fileType) =>
                 {
-                    BrodcastFileWatingToDownload(recivingUserName, sendingUserName, fileUrl , portraitOrlandscape, fileType);
+                    BrodcastFileWatingToDownload(recivingUserName, sendingUserName, fileUrl, portraitOrlandscape, fileType);
                 });
-
 
                 hubConnection.Closed += async (error) =>
                 {
-
                     await ReconnectToSignalRHub();
-                    
                 };
-
-
-
-
             }
             catch (Exception ex)
             {
@@ -251,15 +220,6 @@ namespace Signalir_ChatApp
             SendBroadcast(intent);
         }
 
-
-        private void BroadcastRemoteUserInfo(string userName, string userId)
-        {
-            var intent = new Intent("getRemoteUserIdFromServer");
-            intent.PutExtra("UserName", userName);
-            intent.PutExtra("UserId", userId);
-            SendBroadcast(intent);
-        }
-
         private void BrodcastUpdateUserList(string userName, List<ConnectedUser> userList)
         {
             // TransferUserListManager העדכון  נעשה דרך רשימה  
@@ -269,7 +229,7 @@ namespace Signalir_ChatApp
         }
 
 
-        private void BrodcastOpenWebrtcPage(string remoteUser, string play , string audioOrVideo)
+        private void BrodcastOpenWebrtcPage(string remoteUser, string play, string audioOrVideo)
         {
             SignalRHub.CallIsActive = false;
             var intent = new Intent("OpenWebrtcPage");
@@ -291,7 +251,7 @@ namespace Signalir_ChatApp
         }
 
         //  קובץ ממתין להורדה
-        private void BrodcastFileWatingToDownload(string recivingUserName, string sendingUserName,string fileUrl ,string portraitOrlandscape,string fileType)
+        private void BrodcastFileWatingToDownload(string recivingUserName, string sendingUserName, string fileUrl, string portraitOrlandscape, string fileType)
         {
             var intent = new Intent("FileWatingToDownload");
             intent.PutExtra("RecivingUserName", recivingUserName);
@@ -300,7 +260,7 @@ namespace Signalir_ChatApp
             intent.PutExtra("PortraitOrlandscape", portraitOrlandscape);
             intent.PutExtra("FileType", fileType);
             SendBroadcast(intent);
-        } 
+        }
 
 
         public void BrodcastWakeUp()
@@ -356,10 +316,10 @@ namespace Signalir_ChatApp
             base.OnDestroy();
             try
             {
-                
+
                 // Stop the SignalR connection when the service is destroyed
                 await SignalRHub.Connection.StopAsync();
-                
+
                 Console.WriteLine("SignalR connection stopped.");
             }
             catch (Exception ex)
@@ -367,7 +327,7 @@ namespace Signalir_ChatApp
                 Console.WriteLine($"Error stopping SignalR connection: {ex.Message}");
             }
 
-           // ShowStopNotification();
+            // ShowStopNotification();
             isServiceRunning = false;
         }
 
@@ -375,13 +335,13 @@ namespace Signalir_ChatApp
 
         private void ShowNotification(string title, string message)
         {
-            if (MainActivity.MainactivtyFocoused  || user_detailed.User_DetailedactivtyFocoused)
+            if (MainActivity.MainactivtyFocoused || user_detailed.User_DetailedactivtyFocoused)
             {
 
                 return; // אל תציג הודעה
             }
 
-           
+
 
             var notificationIntent = new Intent(this, typeof(MainActivity));
             notificationIntent.PutExtra("NotificationMessage", message);
@@ -455,7 +415,7 @@ namespace Signalir_ChatApp
 
 
         //=========    Keep Alive ====================
-        public  async Task StartKeepAliveAsync()
+        public async Task StartKeepAliveAsync()
         {
             // Cancel any existing keep-alive task
             _keepAliveTokenSource?.Cancel();
@@ -473,19 +433,19 @@ namespace Signalir_ChatApp
                         ServerIsAlive = false;
                         if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
                         {
-                            
-                            await SignalRHub.Connection.InvokeAsync("KeepAlive" , MainActivity.localUserRegestrationName );
-                           
+
+                            await SignalRHub.Connection.InvokeAsync("KeepAlive", MainActivity.localUserRegestrationName);
+
                         }
                         try
                         {
                             if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Disconnected)
                             {
-                                 BrodcastWakeUp();
-                                
+                                BrodcastWakeUp();
+
                             }
                         }
-                        catch(Exception e)
+                        catch (Exception e)
                         {
                             Console.WriteLine(e);
                         }
@@ -503,9 +463,9 @@ namespace Signalir_ChatApp
         }
 
 
-        
 
-       
+
+
 
     }// the end 
 }

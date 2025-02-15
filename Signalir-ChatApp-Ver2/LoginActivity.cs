@@ -29,21 +29,60 @@ namespace Signalir_ChatApp
             username = FindViewById<EditText>(Resource.Id.connectionText);
             password = FindViewById<EditText>(Resource.Id.connectionText);
             link = FindViewById<TextView>(Resource.Id.SignUpLink);
-            btn = FindViewById<Button>(Resource.Id.LoginButton);
+            loginBtn = FindViewById<Button>(Resource.Id.LoginButton);
             Cancelbtn = FindViewById<Button>(Resource.Id.cancelButton);
+
             home.Click += Home_Click;
             link.Click += Link_Click;
-            Cancelbtn.Click += async (sender, e) =>
-            {
-
-                Finish();
-
-            };
-
-
-
+            Cancelbtn.Click += Cancel_Click;
+            loginBtn.Click += Login_Click;
         }
 
+        private void Login_Click(object sender, EventArgs e)
+        {
+            //  בדוק אם אחד מהשדות ריק
+            if (string.IsNullOrEmpty(username.Text) || string.IsNullOrEmpty(password.Text))
+            {
+                Toast.MakeText(this, "Username or Password is empty", ToastLength.Long).Show();
+                return; // צא מהפונקציה
+            }
+
+            if (SignalRHub.Connection.State == HubConnectionState.Connected)
+            {
+                // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
+                string user = username.Text;
+                string password = password.Text;
+                string result = await SignalRHub.Connection.InvokeAsync<string>(
+                    "LoginUser",
+                    user,
+                    password
+                );
+
+                if (result == "Success")
+                {
+                    Toast.MakeText(this, "User Login Successfully", ToastLength.Long).Show();
+
+                    // שמור את שם המשתמש במכשיר בשביל שימושים עתידיים
+                    // בתוך shared preferences
+                    // string appName = Resources.GetString(Resource.String.app_name);
+                    // var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
+                    // var editor = prefs.Edit();
+                    // editor.PutString("UserName", user);
+                    // editor.Apply();
+
+                    // חזור לחלון הקודם
+                    Finish();
+                }
+                else if (result == "UserDoesNotExist")
+                {
+                    Toast.MakeText(this, "This User Does Not Exist !!", ToastLength.Long).Show();
+                }
+            }
+            else
+            {
+                Toast.MakeText(this, "Server Is Not Connected !!", ToastLength.Long).Show();
+            }
+        }
        
         private void Link_Click(object sender, EventArgs e)
         {
@@ -53,8 +92,12 @@ namespace Signalir_ChatApp
 
         private void Home_Click(object sender, EventArgs e)
         {
-            Intent intent = new Intent(this, typeof(MainActivity));
-            StartActivity(intent);
+            Finish();
+        }
+
+        private void Cancel_Click(object sender, EventArgs e)
+        {
+            Finish();
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Signalir_ChatApp
     public class ipAdress : Activity
     {
         private ImageView home;
-        private EditText ipAdressText;
+        private EditText ipAddressText;
         private EditText portText;
         private Button okButton;
         private Button cancellButton;
@@ -28,7 +28,7 @@ namespace Signalir_ChatApp
             SetContentView(Resource.Layout.ipAdress);
 
 
-            ipAdressText = FindViewById<EditText>(Resource.Id.IPText);
+            ipAddressText = FindViewById<EditText>(Resource.Id.IPText);
             portText = FindViewById<EditText>(Resource.Id.portText);
             okButton = FindViewById<Button>(Resource.Id.okButton);
             cancellButton = FindViewById<Button>(Resource.Id.cancelButton);
@@ -39,18 +39,18 @@ namespace Signalir_ChatApp
 
             var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
 
-            
-            string savedServerIpAdress = prefs.GetString("IpAdress", "NoServerIp");
+
+            string savedServerIpAddress = prefs.GetString("IpAddress", "NoServerIp");
 
 
 
-            if ((savedServerIpAdress != "NoServerIp") && (savedServerIpAdress != null))
+            if ((savedServerIpAddress != "NoServerIp") && (savedServerIpAddress != null))
             {
-                 savedServerIpAdress = prefs.GetString("IpAdress", "NoServerIp");
+                savedServerIpAddress = prefs.GetString("IpAddress", "NoServerIp");
                 //  רוצים להפריד בן כתובת איפי לפורט
                 //  :  נחפש 
-                string[] parts = savedServerIpAdress.Split(':');
-                ipAdressText.Text = parts[0];
+                string[] parts = savedServerIpAddress.Split(':');
+                ipAddressText.Text = parts[0];
                 portText.Text = parts[1];
             }
 
@@ -58,34 +58,28 @@ namespace Signalir_ChatApp
 
 
             //   כפתור הרשמה נלחץ
-            okButton.Click +=  (sender, e) => {
-                
-
-                string ipPlusPort = ipAdressText.Text + ":" + portText.Text;
+            okButton.Click += (sender, e) =>
+            {
+                string ipPlusPort = ipAddressText.Text + ":" + portText.Text;
                 string appName = Resources.GetString(Resource.String.app_name);
 
                 var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
                 var editor = prefs.Edit();
 
-                editor.Remove("IpAdress");
-                editor.PutString("IpAdress", ipPlusPort);
+                editor.Remove("IpAddress");
+                editor.PutString("IpAddress", ipPlusPort);
                 editor.Apply();
                 Finish();
-
-
             };
 
             cancellButton.Click += (sender, e) =>
             {
                 Finish();
             };
-
-
-            }
+        }
         private void Home_Click(object sender, EventArgs e)
         {
-            Intent intent = new Intent(this, typeof(MainActivity));
-            StartActivity(intent);
+            Finish();
         }
     }
 

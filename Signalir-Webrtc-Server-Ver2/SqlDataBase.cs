@@ -94,7 +94,7 @@
                             // הוספת המשתמש לרשימת כל המשתמשים (UserList)
                             string userName = reader["UserName"]?.ToString() ?? string.Empty;
                             string connectionId = reader["ConnectionID"]?.ToString() ?? string.Empty;
-                            AllUseres.UserList.Add(new User { ConnectionId = connectionId, UserName = userName });
+                            AllUsers.UserList.Add(new User { ConnectionId = connectionId, UserName = userName });
                         }
                     }
                 }
@@ -116,6 +116,28 @@
                 using (var cmd = new SQLiteCommand(query, connection)) // הכנת פקודת SQL לביצוע
                 {
                     cmd.Parameters.AddWithValue("@UserName", userName); // הוספת שם המשתמש לשאילתה
+
+                    int count = Convert.ToInt32(cmd.ExecuteScalar()); // קבלת התוצאה כמספר שלם
+
+                    if (count > 0) return true; // החזרת true אם יש לפחות משתמש אחד
+                    else return false; // החזרת false אם אין משתמשים עם שם כזה
+                }
+            }
+        }
+
+        public static bool DoesUserAndPasswordExist(string userName, string password)
+        {
+            using (var connection = new SQLiteConnection(connectionString)) // פתיחת חיבור למסד הנתונים
+            {
+                connection.Open(); // פתיחת החיבור
+
+                // שאילתה לספירת מספר המשתמשים עם שם המשתמש המבוקש
+                string query = "SELECT COUNT(1) FROM Users WHERE UserName = @UserName AND PassWord = @PassWord";
+
+                using (var cmd = new SQLiteCommand(query, connection)) // הכנת פקודת SQL לביצוע
+                {
+                    cmd.Parameters.AddWithValue("@UserName", userName); // הוספת שם המשתמש לשאילתה
+                    cmd.Parameters.AddWithValue("@PassWord", password); // הוספת הסיסמה לשאילתה
 
                     int count = Convert.ToInt32(cmd.ExecuteScalar()); // קבלת התוצאה כמספר שלם
 
