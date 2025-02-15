@@ -819,7 +819,6 @@ namespace Signalir_ChatApp
         {
             var usersInDb = usersListdDbHelper.GetUsersFromDatabase();
 
-
             RunOnUiThread(() =>
             {
                 conectedusers.Clear();
@@ -830,10 +829,7 @@ namespace Signalir_ChatApp
                     var newConection = new ConnectedUsersList(userName, connectionId);
                     conectedusers.Add(newConection);
                     adapter.NotifyDataSetChanged();
-
                 }
-
-
             });
 
             // TransferUserListManager ניצור רשימה חדשה ונעביר לרשימת
@@ -1000,7 +996,9 @@ namespace Signalir_ChatApp
                 {
 
                     case "StatusUpdate":
-                        contextActivity.UpdateConnectionStatus();
+                        RunOnUiThread(() => {
+                            contextActivity.UpdateConnectionStatus();
+                        });
                         break;
 
                     case "ResetConection":
@@ -1024,9 +1022,7 @@ namespace Signalir_ChatApp
                         break;
 
                     case "UpdateUserList":
-
                         contextActivity.UpdateConnectedUserList();
-
                         break;
 
                     case "OpenWebrtcPage":

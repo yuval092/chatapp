@@ -201,7 +201,6 @@ namespace Signalir_ChatApp
                     await ReconnectToSignalRHub();
             }
         }
-
         private void BroadcastConnectionStatus(string action, string message, string connectionId)
         {
             var intent = new Intent(action);
