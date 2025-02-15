@@ -104,7 +104,7 @@
 
             // בדוק אם המשתמש קיים במסד הנתונים, כלומר אם הוא נרשם בעבר.
             // במידה ואינו נרשם בעבר, נסרב לתת לו להתחבר ונעדכן את הלקוח.
-            if (! DoesUserAndPasswordExist(userName, password))
+            if (!SqlDataBase.DoesUserAndPasswordExist(userName, password))
             {
                 Console.WriteLine($"User {userName} doesn't exist in Database --> LOGIN FAILED");
                 return "UserDoesNotExist";
@@ -124,7 +124,7 @@
         // ============ קבל זיהוי משתמש מרוחק לפי שם ==============================
         //==========================================================================
 
-        public async Task<string> IsLoginComplete(string remoteUserId)
+        public async Task<string> IsLoginComplete()
         {
             var connectionId = Context.ConnectionId;
             if (connectedUsers.TryGetValue(connectionId, out string value))
@@ -155,7 +155,7 @@
             else
             {
                 // אם המשתמש לא קיים, מוסיף אותו לבסיס הנתונים
-                SqlDataBase.InsertUser(user, phonenumber, password);
+                SqlDataBase.InsertUser(username, phonenumber, password);
 
                 // שולח הודעה ללקוח שההרשמה בוצעה בהצלחה
                 return "Success";
@@ -329,6 +329,7 @@
         // sending
         public async Task SendMessageToClient(string connectionId, string sendingUser ,string recivingUser ,  string message)
         {
+            Console.WriteLine($"M E O W: {connectionId} {sendingUser} {recivingUser}");
             await Clients.Client(connectionId).SendAsync("ReceiveMessage", sendingUser,recivingUser , message);
         }
     }

@@ -667,49 +667,51 @@ namespace Signalir_ChatApp
 
         public void UpdateConnectionStatus()
         {
-
-            // האם המשתמש כבר התחבר עם שם משתמש וסיסמה?
-            // במידה וכן, עדכן במסך כי המכשיר התחבר לשרת בהצלחה.
-            // אחרת, עדכן כי על המשתמש להתחבר עם שם משתמש וסיסמה לפני שיוכל לעשות משהו.
-
-            conectionText = FindViewById<TextView>(Resource.Id.connectionText);
-            if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
+            RunOnUiThread(async () =>
             {
-                // נבדוק אם כבר ביצענו login
-                string result = await SignalRHub.Connection.InvokeAsync<string>("IsLoginComplete");
+                // האם המשתמש כבר התחבר עם שם משתמש וסיסמה?
+                // במידה וכן, עדכן במסך כי המכשיר התחבר לשרת בהצלחה.
+                // אחרת, עדכן כי על המשתמש להתחבר עם שם משתמש וסיסמה לפני שיוכל לעשות משהו.
 
-                if (string.IsNullOrEmpty(result))
+                conectionText = FindViewById<TextView>(Resource.Id.connectionText);
+                if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
                 {
-                    // ERROR!!
-                    Toast.MakeText(Android.App.Application.Context, $"Failed to call 'IsLoginComplete'.", ToastLength.Long).Show();
-                }
-                if (result == "NoLogin")
-                {
-                    conectionText.Text = "Connected To Server, Please Login!";
-                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightBlue);
+                    // נבדוק אם כבר ביצענו login
+                    string result = await SignalRHub.Connection.InvokeAsync<string>("IsLoginComplete");
+
+                    if (string.IsNullOrEmpty(result))
+                    {
+                        // ERROR!!
+                        Toast.MakeText(Android.App.Application.Context, $"Failed to call 'IsLoginComplete'.", ToastLength.Long).Show();
+                    }
+                    if (result == "NoLogin")
+                    {
+                        conectionText.Text = "Connected To Server, Please Login!";
+                        conectionText.SetBackgroundColor(Android.Graphics.Color.LightBlue);
+                    }
+                    else
+                    {
+                        localUserRegestrationName = result;
+                        conectionText.Text = $"Connected To Server, User: {localUserRegestrationName}";
+                        conectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
+                    }
                 }
                 else
                 {
-                    localUserRegestrationName = result;
-                    conectionText.Text = $"Connected To Server, User: {localUserRegestrationName}";
-                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
+                    if (SignalRHub.Connection == null || ! SignalRHub.startedRunning)
+                    {
+                        // עדיין לא התחיל לרוץ הservice.
+                        conectionText.Text = "Not Connected To Server (Service Not Running)!";
+                        conectionText.SetBackgroundColor(Android.Graphics.Color.Pink);
+                    }
+                    else
+                    {
+                        // המכשיר לא מחובר אל השרת. עדכן זאת בממשק המשתמש.
+                        conectionText.Text = "Not Connected To Server (Service Running)!";
+                        conectionText.SetBackgroundColor(Android.Graphics.Color.Pink);
+                    }
                 }
-            }
-            else
-            {
-                if (SignalRHub.Connection == null || !SignalRHub.startedRunning)
-                {
-                    // עדיין לא התחיל לרוץ הservice.
-                    conectionText.Text = "Not Connected To Server (Service Not Running)!";
-                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightRed);
-                }
-                else
-                {
-                    // המכשיר לא מחובר אל השרת. עדכן זאת בממשק המשתמש.
-                    conectionText.Text = "Not Connected To Server (Service Running)!";
-                    conectionText.SetBackgroundColor(Android.Graphics.Color.LightRed);
-                }
-            }
+            });
         }
 
         //   עדכון משתמשים מחוברים
@@ -991,14 +993,13 @@ namespace Signalir_ChatApp
             public override void OnReceive(Context context, Android.Content.Intent intent)
             {
                 string action = intent.Action;
+                string message;
 
                 switch (action)
                 {
 
                     case "StatusUpdate":
-                        RunOnUiThread(() => {
-                            contextActivity.UpdateConnectionStatus();
-                        });
+                        contextActivity.UpdateConnectionStatus();
                         break;
 
                     case "ResetConection":

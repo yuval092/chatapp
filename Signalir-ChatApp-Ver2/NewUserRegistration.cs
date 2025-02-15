@@ -41,7 +41,7 @@ namespace Signalir_ChatApp
             registerButton.Click += Register_Click;
         }
 
-        private void Register_Click(object sender, EventArgs e)
+        private async void Register_Click(object sender, EventArgs e)
         {
             //  בדוק אם אחד מהשדות ריק
             if (string.IsNullOrEmpty(userNameText.Text) || string.IsNullOrEmpty(phoneNumberText.Text) || string.IsNullOrEmpty(passwordText.Text))
@@ -53,8 +53,8 @@ namespace Signalir_ChatApp
             if (SignalRHub.Connection.State == HubConnectionState.Connected)
             {
                 // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
-                string user = userNameText.Text;
-                string phonenumber = phoneNumberText.Text;
+                string user = userNameText.Text.Trim();
+                string phonenumber = phoneNumberText.Text.Trim();
                 string password = passwordText.Text;
                 string result = await SignalRHub.Connection.InvokeAsync<string>(
                     "RegisterNewUser",

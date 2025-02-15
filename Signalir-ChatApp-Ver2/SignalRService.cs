@@ -43,24 +43,26 @@ namespace Signalir_ChatApp
         {
             base.OnCreate();
 
-            SignalRHub.startedRunning = false;
             InitializeService();
         }
 
         //============================================
-        private static async void InitializeService()
+        private async void InitializeService()
         {
             // Initialize SignalR connection, create notification channel, etc.
-            while (!InitializeSignalR())
-            {
-                // לא הצלחנו לבצע אתחול. נישן קצת וננסה שוב.
-                Thread.Sleep(1000);
-            }
+            InitializeSignalR();
+            //while (!InitializeSignalR())
+            //{
+            // לא הצלחנו לבצע אתחול. נישן קצת וננסה שוב.
+            //Console.WriteLine("WAITINGGGGGGGGGGGGGGGGGG");
+            //    Thread.Sleep(5000);
+            //}
             CreateNotificationChannel();
 
             // Start the SignalR connection if it isn't running already
             if (!isServiceRunning)
             {
+                Console.WriteLine("@@@@@@@@@@@@@@ 1");
                 // Start the connection to SignalR hub
                 Task.Run(async () => await ConnectToSignalRHub());
                 Thread.Sleep(1000);
@@ -71,6 +73,7 @@ namespace Signalir_ChatApp
                 StartForeground(NotificationId, notification);
                 isServiceRunning = true;
                 SignalRHub.startedRunning = true;
+                Console.WriteLine("@@@@@@@@@@@@@@ 2");
             }
         }
 
@@ -81,12 +84,14 @@ namespace Signalir_ChatApp
             // תבדוק האם הגדרנו לאיזה שרת להתחבר
             string appName = Application.Context.Resources.GetString(Resource.String.app_name);
             var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
-            string savedIpAddress = prefs.GetString("IpAdress", "NoServerIp");
+            string savedIpAddress = prefs.GetString("IpAddress", "NoServerIp");
             if (string.IsNullOrEmpty(savedIpAddress) || savedIpAddress == "NoServerIp")
             {
                 Console.WriteLine("Can't connect to server - IP address not configured.");
                 return false;
             }
+            Console.WriteLine("@@@@@@@@@@@@@@ 3");
+            Console.WriteLine(savedIpAddress);
 
             // מעולה. עכשיו אפשר להתחבר לשרת!
 
@@ -111,6 +116,7 @@ namespace Signalir_ChatApp
 
             // Assign the connection to the shared SignalRHub class
             SignalRHub.Connection = hubConnection;
+            Console.WriteLine("@@@@@@@@@@@@@@ 4");
             return true;
         }
 

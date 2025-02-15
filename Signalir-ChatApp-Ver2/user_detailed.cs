@@ -296,10 +296,14 @@ namespace Signalir_ChatApp
 
                 if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
                 {
-
+                    Toast.MakeText(Android.App.Application.Context, $"################################## {user.ConnectionId} {localUserRegestrationName} {user.UserName}", ToastLength.Long).Show();
                     await SendMessage(user.ConnectionId, localUserRegestrationName, user.UserName, messageText);
                 }
 
+            }
+            else
+            {
+                Toast.MakeText(Android.App.Application.Context, "********** ABCDEFGHIJKLMNOPQRSTUVWXYZ", ToastLength.Long).Show();
             }
 
 
@@ -347,10 +351,11 @@ namespace Signalir_ChatApp
             try
             {
                 await SignalRHub.Connection.InvokeAsync("SendMessageToClient", connectionId, sendingUser, recivingUser, message);
-
+                Toast.MakeText(Android.App.Application.Context, $"afterrrrrrrrrrrrrr", ToastLength.Long).Show();
             }
             catch (System.Exception ex)
             {
+                Toast.MakeText(Android.App.Application.Context, $"PPPPPPPPPPPPPPPPPPPPPPPPPPP", ToastLength.Long).Show();
                 Console.WriteLine($"Error: {ex.Message}");
 
             }

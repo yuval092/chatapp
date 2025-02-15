@@ -17,17 +17,17 @@ namespace Signalir_ChatApp
     public class LoginActivity : Activity
     {
         ImageView home;
-        EditText username, password;
+        EditText usernameText, passwordText;
         TextView link;
-        Button btn, Cancelbtn;
+        Button loginBtn, Cancelbtn;
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
             SetContentView(Resource.Layout.Login);
             // Create your application here
             home = FindViewById<ImageView>(Resource.Id.HomeIcon);
-            username = FindViewById<EditText>(Resource.Id.connectionText);
-            password = FindViewById<EditText>(Resource.Id.connectionText);
+            usernameText = FindViewById<EditText>(Resource.Id.Username_Login);
+            passwordText = FindViewById<EditText>(Resource.Id.Password_Login);
             link = FindViewById<TextView>(Resource.Id.SignUpLink);
             loginBtn = FindViewById<Button>(Resource.Id.LoginButton);
             Cancelbtn = FindViewById<Button>(Resource.Id.cancelButton);
@@ -38,10 +38,10 @@ namespace Signalir_ChatApp
             loginBtn.Click += Login_Click;
         }
 
-        private void Login_Click(object sender, EventArgs e)
+        private async void Login_Click(object sender, EventArgs e)
         {
             //  בדוק אם אחד מהשדות ריק
-            if (string.IsNullOrEmpty(username.Text) || string.IsNullOrEmpty(password.Text))
+            if (string.IsNullOrEmpty(usernameText.Text) || string.IsNullOrEmpty(passwordText.Text))
             {
                 Toast.MakeText(this, "Username or Password is empty", ToastLength.Long).Show();
                 return; // צא מהפונקציה
@@ -50,13 +50,9 @@ namespace Signalir_ChatApp
             if (SignalRHub.Connection.State == HubConnectionState.Connected)
             {
                 // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
-                string user = username.Text;
-                string password = password.Text;
-                string result = await SignalRHub.Connection.InvokeAsync<string>(
-                    "LoginUser",
-                    user,
-                    password
-                );
+                string user = usernameText.Text;
+                string password = passwordText.Text;
+                string result = await SignalRHub.Connection.InvokeAsync<string>("LoginUser", user, password);
 
                 if (result == "Success")
                 {
