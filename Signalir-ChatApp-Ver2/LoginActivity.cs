@@ -50,8 +50,8 @@ namespace Signalir_ChatApp
             if (SignalRHub.Connection.State == HubConnectionState.Connected)
             {
                 // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
-                string user = usernameText.Text;
-                string password = passwordText.Text;
+                string user = usernameText.Text.Trim();
+                string password = passwordText.Text.Trim();
                 string result = await SignalRHub.Connection.InvokeAsync<string>("LoginUser", user, password);
 
                 if (result == "Success")

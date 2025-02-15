@@ -99,10 +99,10 @@ app.MapFallbackToFile("index.html"); // Serves `wwwroot/index.html` by default
 SqlDataBase.DeleteDataBase();
 SqlDataBase.CreateDatabase();
 
-SqlDataBase.InsertUser("Test1", "11111111", "1234567890");
-SqlDataBase.InsertUser("Test2", "22222222", "1234567890");
-SqlDataBase.InsertUser("Test3", "33333333", "1234567890");
-SqlDataBase.UpdateUserListFromDataBase();
+// SqlDataBase.InsertUser("Test1", "11111111", "1234567890");
+// SqlDataBase.InsertUser("Test2", "22222222", "1234567890");
+// SqlDataBase.InsertUser("Test3", "33333333", "1234567890");
+// SqlDataBase.UpdateUserListFromDataBase();
 
 
 

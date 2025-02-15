@@ -27,3 +27,27 @@
 2. Does the WebRTC currently work...?
 
 
+
+What would we like to do every once in a while:
+1. Check if we are connected to the server
+2. Check if we are logined in or not
+3. Get the list of currently connected users
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

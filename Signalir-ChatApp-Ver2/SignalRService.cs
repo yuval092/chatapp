@@ -137,10 +137,10 @@ namespace Signalir_ChatApp
                     BroadcastMessage("ReceiveMessage", sendingUser, recivingUser, message);
                 });
 
-                hubConnection.On<string, List<ConnectedUser>>("UpdateUserList", (userName, userList) =>
+                hubConnection.On<List<ConnectedUser>>("UpdateUserList", (usersList) =>
                 {
-                    TransferUserListManager.UpdateUserList(userList);
-                    BrodcastUpdateUserList(userName, userList);
+                    TransferUserListManager.UpdateUserList(usersList);
+                    BrodcastUpdateUserList();
                 });
 
                 //    בקשה לשיחת וידאו התקבלה
@@ -225,7 +225,7 @@ namespace Signalir_ChatApp
             SendBroadcast(intent);
         }
 
-        private void BrodcastUpdateUserList(string userName, List<ConnectedUser> userList)
+        private void BrodcastUpdateUserList()
         {
             // TransferUserListManager העדכון  נעשה דרך רשימה  
 

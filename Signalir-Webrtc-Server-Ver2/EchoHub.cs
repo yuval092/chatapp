@@ -13,22 +13,19 @@
     {
         // Store connected users
         public static readonly ConcurrentDictionary<string, string> connectedUsers = new();
-
-
-
         public class User // מחלקה בשם 
         {
             public string? ConnectionId { get; set; }
             public string? UserName { get; set; }
         }
 
-        //   רשימה שמכילה את כול המשתמשים הרשומים 
-        //   מחוברים ולא מחוברים
-        public static class AllUsers
-        {
+        // //   רשימה שמכילה את כול המשתמשים הרשומים 
+        // //   מחוברים ולא מחוברים
+        // public static class AllUsers
+        // {
             
-            public static List<User> UserList = new List<User>();
-        }
+        //     public static List<User> UserList = new List<User>();
+        // }
 
 
         public class NewOfferData //WebRTC שמועברת במהלך תהליך (offer) משמשת לאחסון נתונים הקשורים להצעה 
@@ -38,10 +35,8 @@
 
         }
 
-
         public  async Task FileRecived()   // ומודיעה לו שהשרת בחיים יחד עם מחרוזת כפרמטר נוסף JKJ שולחת הודעה ללקוח ספציפי עם מזהה חיבור
         {
-          
             await Clients.Client("jkj").SendAsync("ServerIsAlive", "jhjhj");
         }
 
@@ -68,10 +63,10 @@
             connectedUsers.TryRemove(Context.ConnectionId, out _);
 
             // מחפש את המשתמש ברשימת AllUsers.UserList בהתאם למזהה החיבור שלו
-            var userToUpdate = AllUsers.UserList.FirstOrDefault(u => u.ConnectionId == Context.ConnectionId);
+            // var userToUpdate = AllUsers.UserList.FirstOrDefault(u => u.ConnectionId == Context.ConnectionId);
 
             // אם המשתמש נמצא ברשימה, מסיר אותו
-            if (userToUpdate != null) AllUsers.UserList.Remove(userToUpdate);
+            // if (userToUpdate != null) AllUsers.UserList.Remove(userToUpdate);
 
             // שידור רשימת המשתמשים המעודכנת ללקוחות המחוברים
             await UpdateUserList();
@@ -124,16 +119,25 @@
         // ============ קבל זיהוי משתמש מרוחק לפי שם ==============================
         //==========================================================================
 
-        public async Task<string> IsLoginComplete()
+        public async Task<string, List<User>> GetStatusFromServer()
         {
+            string username = "NoLogin";
             var connectionId = Context.ConnectionId;
             if (connectedUsers.TryGetValue(connectionId, out string value))
             {
-                Console.WriteLine($"Returning username: {value}");
-                return value;
+                username = value;
             }
 
-            return "NoLogin";
+            List<User> usersList = new List<User>();
+            foreach (var user in connectedUsers)
+            {
+                if (user != null && ! string.IsNullOrEmpty(user.Key) && ! string.IsNullOrEmpty(user.Value))
+                {
+                    usersList.Add(new User { ConnectionId = user.Key, UserName = user.Value });
+                }
+            }
+
+            return (username, usersList);
         }
 
         //==========================================================================================
@@ -275,45 +279,29 @@
         /// מתודות עזר
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        public async Task UpdateUserList() //מעדכנת את רשימת המשתמשים המחוברים
+        public async Task UpdateUserList()
         {
-            // עם מזהי החיבור ושמות המשתמש שלהם User יצירת רשימה של אובייקטים מטיפוס 
-
-            foreach (var user in connectedUsers) //עוברת על כל הזוגות במבנה הנתונים שמכיל רק את המשתמשים המחוברים בזמן אמת
+            List<User> usersList = new List<User>();
+            foreach (var user in connectedUsers)
             {
-                //UserToUpdate תואם לשם המשתמש הנוכחי מתוך מסד הנתונים של מחוברים בזמן אמת, אם ימצא שם כזה הוא ישמר במשתנה  UserName חיפוש ברשימת המשתמשים הכללית עבור משתמש ששמו  
-                var userToUpdate = AllUsers.UserList.FirstOrDefault(u => u.UserName == user.Value); 
-
-                // בדיקה האם המשתנה ריק, כלומר המשתנה אינו קיים ברשימת המשתמשים מה שאומר שאינו נרשם בעבר. אם המשתנה ריק יתווסף המשתמש  לרשימה כמשתמש חדש
-                if (userToUpdate == null)
-                    AllUsers.UserList.Add(new User { ConnectionId = user.Key, UserName = user.Value });
-
-                // אם המשתנה אינו ריק דבר שאומר כי המשתמש רשום אז מעדכנים את מזהה החיבור של המשתמש הקיים כדי לוודא שהוא תואם את מזהה החיבור הנוכחי
-                if(userToUpdate != null)
+                if (user != null && ! string.IsNullOrEmpty(user.Key) && ! string.IsNullOrEmpty(user.Value))
                 {
-                    userToUpdate.ConnectionId = user.Key;
-
+                    usersList.Add(new User { ConnectionId = user.Key, UserName = user.Value });
                 }
-               
             }
 
             // Log the user list to the console
-            Console.WriteLine("=====================");
-            foreach (var user in AllUsers.UserList) // לולאה שעוברת על כל אובייקט ברשימה הכללית
+            Console.WriteLine("================ Current Users ================");
+            foreach (var user in usersList) // לולאה שעוברת על כל אובייקט ברשימה הכללית
             {
                 //משאיר מרווח של 15 תווים עבור שם המשתמש כך שהפלט ייראה מסודר בקונסול user.UserName.PadRight(15)
                 //מדפיס לקונסול את שם המשתמש ואת מזהה החיבור שלו
-                if (user != null && ! string.IsNullOrEmpty(user.UserName))
-                {
-                    Console.WriteLine($"User: {user.UserName.PadRight(15)} Connection ID: {user.ConnectionId}");
-                }
+                Console.WriteLine($"User: {user.UserName.PadRight(15)} Connection ID: {user.ConnectionId}");
             }
 
             // שידור רשימת המשתמשים המעודכנת לכל הלקוחות
-            // שולחת לכל המשתמשים אירוע עם שני פרמטרים : (1) מחרוזת לציין שמערכת השרת שידרה את העדכון, (2) רשימה המעודכנת של כל המשתמשים
-            await Clients.All.SendAsync("UpdateUserList", "System", AllUsers.UserList);
+            await Clients.All.SendAsync("UpdateUserList", usersList);
         }
-
 
         // Helper method to retrieve the user's IP address
         private string? GetIpAddress()

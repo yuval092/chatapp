@@ -76,32 +76,32 @@
         }
 
         // עדכון רשימת המשתמשים מתוך מסד הנתונים
-        public static void UpdateUserListFromDataBase()
-        {
-            using (var connection = new SQLiteConnection(connectionString)) // פתיחת חיבור למסד הנתונים
-            {
-                connection.Open(); // פתיחת החיבור
+        // public static void UpdateUserListFromDataBase()
+        // {
+        //     using (var connection = new SQLiteConnection(connectionString)) // פתיחת חיבור למסד הנתונים
+        //     {
+        //         connection.Open(); // פתיחת החיבור
 
-                string selectQuery = "SELECT * FROM Users"; // שאילתה לשליפת כל הרשומות מהטבלה Users
-                using (var cmd = new SQLiteCommand(selectQuery, connection)) // הכנת פקודת SQL לביצוע
-                {
-                    using (var reader = cmd.ExecuteReader()) // קריאת התוצאות מהשאילתה
-                    {
-                        while (reader.Read()) // מעבר על כל רשומה שנמצאה
-                        {
-                            // הדפסת פרטי המשתמש לקונסול
-                            Console.WriteLine($"ID: {reader["Id"]}, UserName: {reader["UserName"]}, Phone: {reader["Phone"]}");
-                            // הוספת המשתמש לרשימת כל המשתמשים (UserList)
-                            string userName = reader["UserName"]?.ToString() ?? string.Empty;
-                            string connectionId = reader["ConnectionID"]?.ToString() ?? string.Empty;
-                            AllUsers.UserList.Add(new User { ConnectionId = connectionId, UserName = userName });
-                        }
-                    }
-                }
+        //         string selectQuery = "SELECT * FROM Users"; // שאילתה לשליפת כל הרשומות מהטבלה Users
+        //         using (var cmd = new SQLiteCommand(selectQuery, connection)) // הכנת פקודת SQL לביצוע
+        //         {
+        //             using (var reader = cmd.ExecuteReader()) // קריאת התוצאות מהשאילתה
+        //             {
+        //                 while (reader.Read()) // מעבר על כל רשומה שנמצאה
+        //                 {
+        //                     // הדפסת פרטי המשתמש לקונסול
+        //                     Console.WriteLine($"ID: {reader["Id"]}, UserName: {reader["UserName"]}, Phone: {reader["Phone"]}");
+        //                     // הוספת המשתמש לרשימת כל המשתמשים (UserList)
+        //                     string userName = reader["UserName"]?.ToString() ?? string.Empty;
+        //                     string connectionId = reader["ConnectionID"]?.ToString() ?? string.Empty;
+        //                     AllUsers.UserList.Add(new User { ConnectionId = connectionId, UserName = userName });
+        //                 }
+        //             }
+        //         }
 
-                connection.Close(); // סגירת החיבור למסד הנתונים
-            }
-        }
+        //         connection.Close(); // סגירת החיבור למסד הנתונים
+        //     }
+        // }
 
         // בדיקה אם משתמש קיים לפי שם משתמש
         public static bool DoesUserExist(string userName)

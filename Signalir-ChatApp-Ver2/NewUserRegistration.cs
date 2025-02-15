@@ -55,7 +55,7 @@ namespace Signalir_ChatApp
                 // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
                 string user = userNameText.Text.Trim();
                 string phonenumber = phoneNumberText.Text.Trim();
-                string password = passwordText.Text;
+                string password = passwordText.Text.Trim();
                 string result = await SignalRHub.Connection.InvokeAsync<string>(
                     "RegisterNewUser",
                     user,

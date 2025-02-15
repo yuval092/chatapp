@@ -35,7 +35,7 @@ namespace Signalir_ChatApp
     {
         public DatabaseHelper usersListdDbHelper { get; set; }
         const int RequestStoragePermissionId = 1;
-        private TextView conectionText;
+        private TextView connectionText;
         private ListView listView;
         private ConectionAdapter adapter;
         public static string localUserRegestrationName;
@@ -45,7 +45,7 @@ namespace Signalir_ChatApp
         public string RemoteWebRtcUserId;
         public static bool MainactivtyFocoused = false;
         public static bool LocalUserExistOnServer = false;
-        List<ConnectedUsersList> conectedusers = new List<ConnectedUsersList> { };
+        List<ConnectedUsersList> connectedUsers = new List<ConnectedUsersList> { };
         private static BroadcastReceiver broadcastReceiver;
         public static bool serviceStarted = false;
 
@@ -76,7 +76,7 @@ namespace Signalir_ChatApp
 
             NewRequestPermissions();
 
-            conectionText = FindViewById<TextView>(Resource.Id.connectionText);
+            connectionText = FindViewById<TextView>(Resource.Id.connectionText);
 
 
             // Initialize ListView
@@ -89,7 +89,7 @@ namespace Signalir_ChatApp
 
 
 
-            adapter = new ConectionAdapter(this, conectedusers);
+            adapter = new ConectionAdapter(this, connectedUsers);
             listView.Adapter = adapter;
             // מחברים את ה-Adapter של ה-ListView לרשימת המשתמשים המחוברים
 
@@ -133,7 +133,7 @@ namespace Signalir_ChatApp
             // כאשר בוחרים משתמש מהרשימה
             listView.ItemClick += async (s, e) =>
             {
-                var conection = conectedusers[e.Position];
+                var conection = connectedUsers[e.Position];
                 // מקבלים את המשתמש שנבחר לפי המיקום שלו ברשימה
 
                 selectedRemoteUserName = conection.Name;
@@ -182,7 +182,7 @@ namespace Signalir_ChatApp
             LoadImageFromPreferences();
             // טוענים את התמונה מפרטי התוכנה
 
-            ReadUserNamefromDataBase();
+            // ReadUserNamefromDataBase();
             // טוענים את שם המשתמש מהבסיס נתונים
         }
 
@@ -596,17 +596,13 @@ namespace Signalir_ChatApp
 
         }
 
-
-
-
         protected async override void OnResume()
         {
             base.OnResume();
-            //  Main Activty  got Foocous 
             MainactivtyFocoused = true;
 
-            // תבדוק מה המצב עם השרת, האם אנחנו מחוברים או לא?
-            UpdateConnectionStatus();
+            // תבדוק מול השרת - האם אנחנו מחוברים כעת או לא?
+            UpdateStatusFromServer();
         }
 
         protected override void OnPause()
@@ -665,50 +661,55 @@ namespace Signalir_ChatApp
 
         }
 
-        public void UpdateConnectionStatus()
-        {
+        /*
+            פונקציה זו נקראת פעם בכמה זמן (לרוב כל פעם שפותחים את המסך הראשי).
+            מטרת פונקציה זו היא להסתנכרן מול השרת ולקבל את הפרטים הבאים:
+            1. האם קיים חיבור תקין מול השרת
+            2. האם אני מחובר למשתמש (כלומר login).
+            3. מה הם יתר המשתמשים שמחוברים כעת? נעדכן את הרשימה בהתאם.
+        */
+        public void UpdateStatusFromServer()
+        {            
             RunOnUiThread(async () =>
             {
-                // האם המשתמש כבר התחבר עם שם משתמש וסיסמה?
-                // במידה וכן, עדכן במסך כי המכשיר התחבר לשרת בהצלחה.
-                // אחרת, עדכן כי על המשתמש להתחבר עם שם משתמש וסיסמה לפני שיוכל לעשות משהו.
-
-                conectionText = FindViewById<TextView>(Resource.Id.connectionText);
+                connectionText = FindViewById<TextView>(Resource.Id.connectionText);
                 if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
                 {
                     // נבדוק אם כבר ביצענו login
-                    string result = await SignalRHub.Connection.InvokeAsync<string>("IsLoginComplete");
+                    var result = await SignalRHub.Connection.InvokeAsync<(string, List<ConnectedUser>)>("GetStatusFromServer");
+                    string myUsername = result.Item1;
+                    string usersFromServer = result.Item2;
 
-                    if (string.IsNullOrEmpty(result))
+                    // 1. עדכן אם אנחנו מחוברים למשתמש כלשהו או לא
+                    if (myUsername == "NoLogin")
                     {
-                        // ERROR!!
-                        Toast.MakeText(Android.App.Application.Context, $"Failed to call 'IsLoginComplete'.", ToastLength.Long).Show();
-                    }
-                    if (result == "NoLogin")
-                    {
-                        conectionText.Text = "Connected To Server, Please Login!";
-                        conectionText.SetBackgroundColor(Android.Graphics.Color.LightBlue);
+                        connectionText.Text = "Connected To Server, Please Login!";
+                        connectionText.SetBackgroundColor(Android.Graphics.Color.LightBlue);
                     }
                     else
                     {
-                        localUserRegestrationName = result;
-                        conectionText.Text = $"Connected To Server, User: {localUserRegestrationName}";
-                        conectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
+                        localUserRegestrationName = myUsername;
+                        connectionText.Text = $"Connected To Server, User: {localUserRegestrationName}";
+                        connectionText.SetBackgroundColor(Android.Graphics.Color.LightGreen);
                     }
+
+                    // 2. עדכן את רשימת המשתמשים המחוברים
+                    TransferUserListManager.UpdateUserList(usersFromServer);
+                    UpdateConnectedUserList();
                 }
                 else
                 {
                     if (SignalRHub.Connection == null || ! SignalRHub.startedRunning)
                     {
                         // עדיין לא התחיל לרוץ הservice.
-                        conectionText.Text = "Not Connected To Server (Service Not Running)!";
-                        conectionText.SetBackgroundColor(Android.Graphics.Color.Pink);
+                        connectionText.Text = "Not Connected To Server (Service Not Running)!";
+                        connectionText.SetBackgroundColor(Android.Graphics.Color.Pink);
                     }
                     else
                     {
                         // המכשיר לא מחובר אל השרת. עדכן זאת בממשק המשתמש.
-                        conectionText.Text = "Not Connected To Server (Service Running)!";
-                        conectionText.SetBackgroundColor(Android.Graphics.Color.Pink);
+                        connectionText.Text = "Not Connected To Server (Service Running)!";
+                        connectionText.SetBackgroundColor(Android.Graphics.Color.Pink);
                     }
                 }
             });
@@ -719,39 +720,10 @@ namespace Signalir_ChatApp
         {
             RunOnUiThread(() =>
             {
-                var currentUserList = TransferUserListManager.ConnectedUsers;
+                List<ConnectedUser> users = TransferUserListManager.ConnectedUsers;
 
-                var tempCurrentUserList = currentUserList;
-
-
-
-                foreach (var user in conectedusers)
-                {
-                    string tempusername = user.Name;
-                    string tempconnectionid = user.ConectioId;
-                    var foundUser = tempCurrentUserList.FirstOrDefault(u => u.UserName == tempusername);
-                    //  משתמש קיים
-                    if (foundUser != null)
-                    {
-
-                    }
-                    // משתמש לא קיים
-                    else
-                    {
-                        ConnectedUser TempConecteduser = new ConnectedUser
-                        {
-                            UserName = tempusername,
-                            ConnectionId = tempconnectionid
-                        };
-                        tempCurrentUserList.Add(TempConecteduser);
-                    }
-                }
-
-                currentUserList = tempCurrentUserList;
-
-                conectedusers.Clear();
-
-                foreach (var user in currentUserList)
+                connectedUsers.Clear();
+                foreach (var user in users)
                 {
                     string connectionId = user.ConnectionId ?? "Unknown ID";
                     string userName = user.UserName ?? "Unknown User";
@@ -759,14 +731,10 @@ namespace Signalir_ChatApp
                     var newConection = new ConnectedUsersList(userName, connectionId);
                     //   "webrtc"   נבדוק ששם המשתמש לא מתחיל עם
                     //   wenrtc      שם משתמש ששמור ללקוח וידאו
-                    if (!userName.StartsWith("webrtc")) conectedusers.Add(newConection);
-
-
+                    if (!userName.StartsWith("webrtc")) connectedUsers.Add(newConection);
                 }
 
-
                 adapter.NotifyDataSetChanged();
-
             });
         }
 
@@ -812,38 +780,36 @@ namespace Signalir_ChatApp
                 db.Close();
 
             }
-
-
         }
 
         //==============       נקרא את המשתמשים הקימים בבסיס הנתונים  =====
-        public void ReadUserNamefromDataBase()
-        {
-            var usersInDb = usersListdDbHelper.GetUsersFromDatabase();
+        // public void ReadUserNamefromDataBase()
+        // {
+        //     var usersInDb = usersListdDbHelper.GetUsersFromDatabase();
 
-            RunOnUiThread(() =>
-            {
-                conectedusers.Clear();
-                foreach (var username in usersInDb)
-                {
-                    string connectionId = "NoId";
-                    string userName = username;
-                    var newConection = new ConnectedUsersList(userName, connectionId);
-                    conectedusers.Add(newConection);
-                    adapter.NotifyDataSetChanged();
-                }
-            });
+        //     RunOnUiThread(() =>
+        //     {
+        //         connectedUsers.Clear();
+        //         foreach (var username in usersInDb)
+        //         {
+        //             string connectionId = "NoId";
+        //             string userName = username;
+        //             var newConection = new ConnectedUsersList(userName, connectionId);
+        //             connectedUsers.Add(newConection);
+        //             adapter.NotifyDataSetChanged();
+        //         }
+        //     });
 
-            // TransferUserListManager ניצור רשימה חדשה ונעביר לרשימת
-            List<ConnectedUser> newList = conectedusers
-           .Select(user => new ConnectedUser
-           {
-               UserName = user.Name,
-               ConnectionId = user.ConectioId
-           }).ToList();
+        //     // TransferUserListManager ניצור רשימה חדשה ונעביר לרשימת
+        //     List<ConnectedUser> newList = connectedUsers
+        //    .Select(user => new ConnectedUser
+        //    {
+        //        UserName = user.Name,
+        //        ConnectionId = user.ConectioId
+        //    }).ToList();
 
-            TransferUserListManager.UpdateUserList(newList);
-        }
+        //     TransferUserListManager.UpdateUserList(newList);
+        // }
 
         //=================================================================
 
@@ -865,9 +831,7 @@ namespace Signalir_ChatApp
                     values.Put("PortraitOrlandscape", portraitOrlandscape);
                     db.Insert("Messages", null, values);
                     db.Close();
-
                 }
-
             }
         }
 
@@ -892,10 +856,6 @@ namespace Signalir_ChatApp
                         intent.PutExtra("VideoOrAudio", audioOrVideo);
                         VideoCallDialogActivity.ResultCallback = HandleDialogResult;
                         StartActivity(intent);
-
-
-
-
                     }
 
                     if (play == "Call")
@@ -920,10 +880,6 @@ namespace Signalir_ChatApp
             });
 
         }
-
-
-
-
 
         public void HandleDialogResult(bool result, string remoteUser, string audioOrVideo)
         {
@@ -999,7 +955,7 @@ namespace Signalir_ChatApp
                 {
 
                     case "StatusUpdate":
-                        contextActivity.UpdateConnectionStatus();
+                        contextActivity.UpdateStatusFromServer();
                         break;
 
                     case "ResetConection":
@@ -1016,10 +972,6 @@ namespace Signalir_ChatApp
                         string recivingUserName = intent.GetStringExtra("RecivingUser");
 
                         contextActivity.UpdateRecivedMessage(sendingUserName, recivingUserName, message);
-
-
-
-
                         break;
 
                     case "UpdateUserList":
