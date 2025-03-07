@@ -147,7 +147,7 @@
             result.MyUserName = userName;
 
             Console.WriteLine($"SyncWithServer Successful - Username: {result.MyUserName}");
-            return "Success";
+            return result;
         }
 
         public async Task<string> SendMessageToUser(string sendingUserName ,string receivingUserName, string message)
@@ -183,8 +183,11 @@
                 return "MessageCantBeEmpty";
             }
 
+            // 4. שלח את ההודעה אל היעד
+            await Clients.Client(connectionId).SendAsync("ReceiveMessageFromUser", sendingUserName, receivingUserName, message);
+
             Console.WriteLine($"SendMessageToUser Successful - SendingUserName: {sendingUserName}, ReceivingUserName: {receivingUserName}");
-            await Clients.Client(connectionId).SendAsync("ReceiveMessage", sendingUser,recivingUser , message);
+            return "Success";
         }
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
