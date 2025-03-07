@@ -21,6 +21,11 @@ namespace Signalir_ChatApp
 
     }
 
+    public class SyncWithServerData
+    {
+        public string? MyUserName { get; set; }                      // מה הוא שם המשתמש אליו אני מחובר.
+        public List<ConnectedUser>? ConnectedUserNames { get; set; } // רשימת כל המשתמשים המחוברים למערכת
+    }
 
     [Service]
     public class SignalRService : Service

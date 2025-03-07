@@ -24,7 +24,6 @@
     {
         public object? offer { get; set; }
         public string? remoteUserId { get; set; }
-
     }
 
     public class EchoHub : Hub
@@ -118,13 +117,13 @@
             return "Success";
         }
 
-        public async Task<string, List<User>> SyncWithServer()
+        public async Task<SyncWithServerData> SyncWithServer()
         {
             var connectionId = Context.ConnectionId;
 
             // 1. האם הלקוח הנוכחי נמצא ברשימת המתמשים המחוברים?
             //    במידה וכן - קח את שם המשתמש אליו הוא מחובר.
-            string userName = null;
+            string userName = "NoLogin";
             if (connectedUsers.TryGetValue(connectionId, out string value))
             {
                 userName = value;

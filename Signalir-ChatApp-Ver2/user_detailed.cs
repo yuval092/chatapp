@@ -296,14 +296,9 @@ namespace Signalir_ChatApp
 
                 if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
                 {
-                    Toast.MakeText(Android.App.Application.Context, $"################################## {user.ConnectionId} {localUserRegestrationName} {user.UserName}", ToastLength.Long).Show();
-                    await SendMessage(user.ConnectionId, localUserRegestrationName, user.UserName, messageText);
+                    await SendMessage(localUserRegestrationName, user.UserName, messageText);
                 }
 
-            }
-            else
-            {
-                Toast.MakeText(Android.App.Application.Context, "********** ABCDEFGHIJKLMNOPQRSTUVWXYZ", ToastLength.Long).Show();
             }
 
 
@@ -346,18 +341,38 @@ namespace Signalir_ChatApp
         //=================================================================
         //============     שלח הודעה למשתמש 
 
-        private async Task SendMessage(string connectionId, string sendingUser, string recivingUser, string message)
+        private async Task SendMessage(string sendingUserName, string receivingUserName, string message)
         {
-            try
+            if (SignalRHub.Connection.State != HubConnectionState.Connected)    // האם אנחנו מחוברים לשרת?
             {
-                await SignalRHub.Connection.InvokeAsync("SendMessageToClient", connectionId, sendingUser, recivingUser, message);
-                Toast.MakeText(Android.App.Application.Context, $"afterrrrrrrrrrrrrr", ToastLength.Long).Show();
+                Toast.MakeText(this, "Server Is Not Connected !!", ToastLength.Long).Show();
+                return;
             }
-            catch (System.Exception ex)
-            {
-                Toast.MakeText(Android.App.Application.Context, $"PPPPPPPPPPPPPPPPPPPPPPPPPPP", ToastLength.Long).Show();
-                Console.WriteLine($"Error: {ex.Message}");
 
+            // שלח את ההודעה אל המשתמש שאנחנו רוצים.
+            // במידה וקיבלנו שגיאה, הצג אותה במסך.
+            string result = await SignalRHub.Connection.InvokeAsync<string>(
+                "SendMessageToUser",
+                sendingUserName,
+                receivingUserName,
+                message
+            );
+
+            if (result == "BadSendingUserName")
+            {
+                Toast.MakeText(Android.App.Application.Context, $"Error: The Sending UserName Was Wrong", ToastLength.Long).Show();
+            }
+            else if (result == "SendingUserNameDidntLogin")
+            {
+                Toast.MakeText(Android.App.Application.Context, $"Error: You Must Login Before Sending Messages", ToastLength.Long).Show();
+            }
+            else if (result == "ReceivingUserNameDidntLogin")
+            {
+                Toast.MakeText(Android.App.Application.Context, $"Error: User {receivingUserName} Is Not Online", ToastLength.Long).Show();
+            }
+            else if (result == "MessageCantBeEmpty")
+            {
+                Toast.MakeText(Android.App.Application.Context, $"Error: Can't Send An Empty Message", ToastLength.Long).Show();
             }
         }
 

@@ -23,10 +23,6 @@ using ImageViews.Photo;
 using AndroidX.Lifecycle;
 using System.Net.Http;
 
-
-
-
-
 namespace Signalir_ChatApp
 {
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme", MainLauncher = true, WindowSoftInputMode = SoftInput.AdjustResize)]
@@ -676,9 +672,9 @@ namespace Signalir_ChatApp
                 if (SignalRHub.Connection != null && SignalRHub.Connection.State == HubConnectionState.Connected)
                 {
                     // נבדוק אם כבר ביצענו login
-                    var result = await SignalRHub.Connection.InvokeAsync<(string, List<ConnectedUser>)>("GetStatusFromServer");
-                    string myUsername = result.Item1;
-                    string usersFromServer = result.Item2;
+                    var result = await SignalRHub.Connection.InvokeAsync<SyncWithServerData>("SyncWithServer");
+                    string myUsername = result.MyUserName;
+                    List<ConnectedUser> connectedUserNames = result.ConnectedUserNames;
 
                     // 1. עדכן אם אנחנו מחוברים למשתמש כלשהו או לא
                     if (myUsername == "NoLogin")
@@ -694,7 +690,7 @@ namespace Signalir_ChatApp
                     }
 
                     // 2. עדכן את רשימת המשתמשים המחוברים
-                    TransferUserListManager.UpdateUserList(usersFromServer);
+                    TransferUserListManager.UpdateUserList(connectedUserNames);
                     UpdateConnectedUserList();
                 }
                 else

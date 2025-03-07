@@ -40,43 +40,44 @@ namespace Signalir_ChatApp
 
         private async void Login_Click(object sender, EventArgs e)
         {
-            //  בדוק אם אחד מהשדות ריק
             if (string.IsNullOrEmpty(usernameText.Text) || string.IsNullOrEmpty(passwordText.Text))
             {
                 Toast.MakeText(this, "Username or Password is empty", ToastLength.Long).Show();
-                return; // צא מהפונקציה
+                return;
             }
-
-            if (SignalRHub.Connection.State == HubConnectionState.Connected)
-            {
-                // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
-                string user = usernameText.Text.Trim();
-                string password = passwordText.Text.Trim();
-                string result = await SignalRHub.Connection.InvokeAsync<string>("LoginUser", user, password);
-
-                if (result == "Success")
-                {
-                    Toast.MakeText(this, "User Login Successfully", ToastLength.Long).Show();
-
-                    // שמור את שם המשתמש במכשיר בשביל שימושים עתידיים
-                    // בתוך shared preferences
-                    // string appName = Resources.GetString(Resource.String.app_name);
-                    // var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
-                    // var editor = prefs.Edit();
-                    // editor.PutString("UserName", user);
-                    // editor.Apply();
-
-                    // חזור לחלון הקודם
-                    Finish();
-                }
-                else if (result == "UserDoesNotExist")
-                {
-                    Toast.MakeText(this, "This User Does Not Exist !!", ToastLength.Long).Show();
-                }
-            }
-            else
+            if (SignalRHub.Connection.State != HubConnectionState.Connected)    // האם אנחנו מחוברים לשרת?
             {
                 Toast.MakeText(this, "Server Is Not Connected !!", ToastLength.Long).Show();
+                return;
+            }
+
+            // שלח את פרטי המשתמש החדש אל השרת על מנת שירשום אותו
+            string user = usernameText.Text.Trim();
+            string password = passwordText.Text.Trim();
+            string result = await SignalRHub.Connection.InvokeAsync<string>("LoginUser", user, password);
+
+            if (result == "UserDoesNotExist")
+            {
+                Toast.MakeText(this, "This User Does Not Exist !!", ToastLength.Long).Show();
+            }
+            else if (result == "UserAlreadyConnected")
+            {
+                Toast.MakeText(this, "This User Was Already Taken By Someone Else !!", ToastLength.Long).Show();
+            }
+            else if (result == "Success")
+            {
+                Toast.MakeText(this, "User Login Successfully :)", ToastLength.Long).Show();
+
+                // שמור את שם המשתמש במכשיר בשביל שימושים עתידיים
+                // בתוך shared preferences
+                // string appName = Resources.GetString(Resource.String.app_name);
+                // var prefs = Application.Context.GetSharedPreferences(appName, FileCreationMode.Private);
+                // var editor = prefs.Edit();
+                // editor.PutString("UserName", user);
+                // editor.Apply();
+
+                // חזור לחלון הקודם
+                Finish();
             }
         }
        
