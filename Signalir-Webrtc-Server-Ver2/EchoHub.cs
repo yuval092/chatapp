@@ -8,46 +8,33 @@
     using System.Data.SQLite;
     using System.Security.Cryptography.X509Certificates;
     using static Signalir_Webrtc_Server.EchoHub;
+    public class User
+    {
+        public string? ConnectionId { get; set; }
+        public string? UserName { get; set; }
+    }
+
+    public class SyncWithServerData
+    {
+        public string? MyUserName { get; set; }                 // מה הוא שם המשתמש אליו אני מחובר. יכול להיות ריק.
+        public List<string>? ConnectedUserNames { get; set; }   // רשימת כל המשתמשים המחוברים למערכת
+    }
+
+    public class NewOfferData //WebRTC שמועברת במהלך תהליך (offer) משמשת לאחסון נתונים הקשורים להצעה 
+    {
+        public object? offer { get; set; }
+        public string? remoteUserId { get; set; }
+
+    }
 
     public class EchoHub : Hub
     {
-        // Store connected users
         public static readonly ConcurrentDictionary<string, string> connectedUsers = new();
-        public class User // מחלקה בשם 
-        {
-            public string? ConnectionId { get; set; }
-            public string? UserName { get; set; }
-        }
-
-        // //   רשימה שמכילה את כול המשתמשים הרשומים 
-        // //   מחוברים ולא מחוברים
-        // public static class AllUsers
-        // {
-            
-        //     public static List<User> UserList = new List<User>();
-        // }
-
-
-        public class NewOfferData //WebRTC שמועברת במהלך תהליך (offer) משמשת לאחסון נתונים הקשורים להצעה 
-        {
-            public object? offer { get; set; }
-            public string? remoteUserId { get; set; }
-
-        }
-
-        public  async Task FileRecived()   // ומודיעה לו שהשרת בחיים יחד עם מחרוזת כפרמטר נוסף JKJ שולחת הודעה ללקוח ספציפי עם מזהה חיבור
-        {
-            await Clients.Client("jkj").SendAsync("ServerIsAlive", "jhjhj");
-        }
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
         /// מתודות של SignalR
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        //=========================================================================
-        // הסר את המשתמש כאשר הוא מתנתק ושדר את רשימת המשתמשים המעודכנת
-        //=========================================================================
-        
         public override async Task OnConnectedAsync()
         {
             var ipAddress = GetIpAddress();
@@ -62,19 +49,11 @@
             // הסרת המשתמש מרשימת המשתמשים המחוברים (TryRemove מסיר את המשתמש אם מזהה החיבור נמצא במילון)
             connectedUsers.TryRemove(Context.ConnectionId, out _);
 
-            // מחפש את המשתמש ברשימת AllUsers.UserList בהתאם למזהה החיבור שלו
-            // var userToUpdate = AllUsers.UserList.FirstOrDefault(u => u.ConnectionId == Context.ConnectionId);
-
-            // אם המשתמש נמצא ברשימה, מסיר אותו
-            // if (userToUpdate != null) AllUsers.UserList.Remove(userToUpdate);
-
             // שידור רשימת המשתמשים המעודכנת ללקוחות המחוברים
-            await UpdateUserList();
+            await UpdateUserList();     // Do we want this??
 
             // קריאה לפונקציה הבסיסית שמבצעת פעולות נוספות במידת הצורך כשמשתמש מתנתק
             await base.OnDisconnectedAsync(exception);
-
-            
         }
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,41 +72,127 @@
             await Clients.Client(connectionId).SendAsync("ServerIsAlive", userName);
         }
 
-        public async Task<string> LoginUser(string userName, string password) // רישום משתמש חדש למערכת כאשר הוא מתחבר לשרת
+        public async Task<string> RegisterUser(string UserName, string phoneNumber, string password)
         {
-            var connectionId = Context.ConnectionId; // הנוכחי websocket ה  Signalir שומרת את מזהה החיבור של המשתמש הנוכחי שנוצר על ידי     
+            string connectionId = Context.ConnectionId;
 
-            // בדוק אם המשתמש קיים במסד הנתונים, כלומר אם הוא נרשם בעבר.
-            // במידה ואינו נרשם בעבר, נסרב לתת לו להתחבר ונעדכן את הלקוח.
+            // 1. האם המשתמש כבר נרשם בעבר למערכת?
+            if (SqlDataBase.DoesUserExist(UserName))
+            {
+                Console.WriteLine($"User {UserName} already exists --> REGISTER FAILED");
+                return "UserExists";
+            }
+
+            // 2. הוסף את המשתמש החדש אל מסד הנתונים
+            SqlDataBase.InsertUser(UserName, phoneNumber, password);
+
+            Console.WriteLine($"Register Successful - UserName: {UserName}, connectionId: {connectionId}");
+            return "Success";
+        }
+
+        public async Task<string> LoginUser(string userName, string password)
+        {
+            var connectionId = Context.ConnectionId;
+
+            // 1. האם שם המשתמש והסיסמה נמצאים במסד הנתונים?
             if (!SqlDataBase.DoesUserAndPasswordExist(userName, password))
             {
                 Console.WriteLine($"User {userName} doesn't exist in Database --> LOGIN FAILED");
                 return "UserDoesNotExist";
             }
 
-            // מוסיפה את המשתמש למסד הנתונים של המשתמשים המחוברים כעת
-            connectedUsers[connectionId] = userName;
-            Console.WriteLine($"Login Successful - Username: {userName}, connectionId: {connectionId}");
+            // 2. האם אחד מהטלפונים האחרים כבר התחבר למשתמש זה?
+            if (connectedUsers.Values.Contains(userName))
+            {
+                Console.WriteLine($"User {userName} is already connected in another device --> LOGIN FAILED");
+                return "UserAlreadyConnected";
+            }
 
-            // שידור את רשימת המשתמשים המעודכנת לכל הלקוחות
+            // 3. ההתחברות הצליחה. עדכן את רשימת המשתמשים המחוברים בהתאם
+            connectedUsers[connectionId] = userName;
+
+            // 4. שלח לכל הלקוחות את רשימת המשתמשים המעודכנת
             await UpdateUserList();
 
-            // החזר תשובה ללקוח שהכל הצליח
+            Console.WriteLine($"Login Successful - Username: {userName}, connectionId: {connectionId}");
             return "Success";
         }
 
-        // ============ קבל זיהוי משתמש מרוחק לפי שם ==============================
-        //==========================================================================
-
-        public async Task<string, List<User>> GetStatusFromServer()
+        public async Task<string, List<User>> SyncWithServer()
         {
-            string username = "NoLogin";
             var connectionId = Context.ConnectionId;
+
+            // 1. האם הלקוח הנוכחי נמצא ברשימת המתמשים המחוברים?
+            //    במידה וכן - קח את שם המשתמש אליו הוא מחובר.
+            string userName = null;
             if (connectedUsers.TryGetValue(connectionId, out string value))
             {
-                username = value;
+                userName = value;
             }
 
+            // 2. תשמור את רשימת כל המשתמשים המחוברים כעת.
+            //    אל תשמור את המשתמש שהלקוח מחובר אליו.
+            List<string> usersList = new List<string>();
+            foreach (var user in connectedUsers)
+            {
+                if (user != null && !string.IsNullOrEmpty(user.Value) && user.Value != userName)
+                {
+                    usersList.Add(user.Value);
+                }
+            }
+
+            // 3. החזר את התשובה ללקוח
+            SyncWithServerData result = new SyncWithServerData();
+            result.ConnectedUserNames = usersList;
+            result.MyUserName = userName;
+
+            Console.WriteLine($"SyncWithServer Successful - Username: {result.MyUserName}");
+            return "Success";
+        }
+
+        public async Task<string> SendMessageToUser(string sendingUserName ,string receivingUserName, string message)
+        {
+            var connectionId = Context.ConnectionId;
+
+            // 1. תוודא שהלקוח מחובר למשתמש, ושמשתמש זה תואם לשם משתמש השולח (sendingUserName)
+            if (connectedUsers.TryGetValue(connectionId, out string value))
+            {
+                if (sendingUserName != value)
+                {
+                    Console.WriteLine($"User {sendingUserName} doesn't belong to current client --> SEND MESSAGE FAILED");
+                    return "BadSendingUserName";
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Please login before sending a message --> SEND MESSAGE FAILED");
+                return "SendingUserNameDidntLogin";
+            }
+
+            // 2. תוודא ששם המשתמש אליו שולחים מחובר כעת למערכת, כלומר מישהו התחבר אליו
+            if (!connectedUsers.Values.Contains(receivingUserName))
+            {
+                Console.WriteLine($"Receiving User {receivingUserName} isn't connected --> SEND MESSAGE FAILED");
+                return "ReceivingUserNameDidntLogin";
+            }
+
+            // 3. תוודא שההודעה שרוצים לשלוח אינה ריקה
+            if (string.IsNullOrEmpty(message))
+            {
+                Console.WriteLine($"Can't send an empty or null message --> SEND MESSAGE FAILED");
+                return "MessageCantBeEmpty";
+            }
+
+            Console.WriteLine($"SendMessageToUser Successful - SendingUserName: {sendingUserName}, ReceivingUserName: {receivingUserName}");
+            await Clients.Client(connectionId).SendAsync("ReceiveMessage", sendingUser,recivingUser , message);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// מתודות שהשרת שולח ללקוח
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        public async Task UpdateUserList()
+        {
             List<User> usersList = new List<User>();
             foreach (var user in connectedUsers)
             {
@@ -137,34 +202,22 @@
                 }
             }
 
-            return (username, usersList);
+            // Log the user list to the console
+            Console.WriteLine("================ Current Users ================");
+            foreach (var user in usersList) // לולאה שעוברת על כל אובייקט ברשימה הכללית
+            {
+                //משאיר מרווח של 15 תווים עבור שם המשתמש כך שהפלט ייראה מסודר בקונסול user.UserName.PadRight(15)
+                //מדפיס לקונסול את שם המשתמש ואת מזהה החיבור שלו
+                Console.WriteLine($"User: {user.UserName.PadRight(15)} Connection ID: {user.ConnectionId}");
+            }
+
+            // שידור רשימת המשתמשים המעודכנת לכל הלקוחות
+            await Clients.All.SendAsync("UpdateUserList", usersList);
         }
 
-        //==========================================================================================
-        //======          Light SQL        בסיס הנתונים  
-        //==========================================================================================
-
-        //מוסיפה משתמש חדש לבסיס הנתונים או מחזירה הודעה אם המשתמש כבר קיים
-        public async Task<string> RegisterNewUser(string username, string phonenumber, string password)
-        {
-            // מקבל את מזהה החיבור הנוכחי
-            string userConnectionId = Context.ConnectionId;
-
-            // בודק אם המשתמש כבר קיים במערכת
-            if (SqlDataBase.DoesUserExist(username))
-            {
-                // אם המשתמש כבר קיים, שולח הודעה ללקוח שהמשתמש כבר קיים במערכת
-                return "UserExists";
-            }
-            else
-            {
-                // אם המשתמש לא קיים, מוסיף אותו לבסיס הנתונים
-                SqlDataBase.InsertUser(username, phonenumber, password);
-
-                // שולח הודעה ללקוח שההרשמה בוצעה בהצלחה
-                return "Success";
-            }
-        }
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// WEB-RTC
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         public async Task SendCandidate(object data, string remoteUserId)
         {
@@ -249,8 +302,6 @@
             }
         }
 
-
-
         //מחזירה את המזהה חיבור של המשתמש שאליו מעוניינים להתקשר
         public async Task openRemoteWebPage(string localUserName, string remoteUserName, string play, string audioOrVideo)
         {
@@ -279,30 +330,6 @@
         /// מתודות עזר
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        public async Task UpdateUserList()
-        {
-            List<User> usersList = new List<User>();
-            foreach (var user in connectedUsers)
-            {
-                if (user != null && ! string.IsNullOrEmpty(user.Key) && ! string.IsNullOrEmpty(user.Value))
-                {
-                    usersList.Add(new User { ConnectionId = user.Key, UserName = user.Value });
-                }
-            }
-
-            // Log the user list to the console
-            Console.WriteLine("================ Current Users ================");
-            foreach (var user in usersList) // לולאה שעוברת על כל אובייקט ברשימה הכללית
-            {
-                //משאיר מרווח של 15 תווים עבור שם המשתמש כך שהפלט ייראה מסודר בקונסול user.UserName.PadRight(15)
-                //מדפיס לקונסול את שם המשתמש ואת מזהה החיבור שלו
-                Console.WriteLine($"User: {user.UserName.PadRight(15)} Connection ID: {user.ConnectionId}");
-            }
-
-            // שידור רשימת המשתמשים המעודכנת לכל הלקוחות
-            await Clients.All.SendAsync("UpdateUserList", usersList);
-        }
-
         // Helper method to retrieve the user's IP address
         private string? GetIpAddress()
         {
@@ -311,14 +338,6 @@
 
             // מחזיר את כתובת ה-IP המרוחקת של הלקוח, אם קיים מידע זה
             return httpContext?.Connection.RemoteIpAddress?.ToString();
-        }
-
-        //שליחת הודעה ללקוח ספציפי לפי מזהה החיבור שלו
-        // sending
-        public async Task SendMessageToClient(string connectionId, string sendingUser ,string recivingUser ,  string message)
-        {
-            Console.WriteLine($"M E O W: {connectionId} {sendingUser} {recivingUser}");
-            await Clients.Client(connectionId).SendAsync("ReceiveMessage", sendingUser,recivingUser , message);
         }
     }
 }
